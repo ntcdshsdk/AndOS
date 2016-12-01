@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="module_news">新闻</string>
+    <string name="module_ecb">电子商务</string>
+    <string name="module_player">视频播放</string>
+</resources>

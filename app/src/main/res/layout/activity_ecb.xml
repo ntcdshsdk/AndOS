@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <include
+        android:id="@+id/layout_title_bar"
+        layout="@layout/layout_title_bar_center" />
+
+    <TextView
+        android:id="@+id/tv_test"
+        android:layout_width="70dp"
+        android:layout_height="70dp"
+        android:background="@color/yellow"
+        android:visibility="gone" />
+
+    <com.osshare.core.view.pull.PullableLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <android.support.v7.widget.RecyclerView
+            android:id="@+id/rv_content"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+        </android.support.v7.widget.RecyclerView>
+    </com.osshare.core.view.pull.PullableLayout>
+</LinearLayout>
