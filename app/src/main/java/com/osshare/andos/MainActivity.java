@@ -39,7 +39,7 @@ public class MainActivity extends BaseActivity {
         radioGroup.setOnCheckedChangeListener(checkedChangeListener);
 
         if (savedInstanceState == null) {
-//            radioGroup.check(R.id.rb_home);
+            ((CompoundButton)radioGroup.findViewById(R.id.rb_home)).setChecked(true);
         }
 
     }
