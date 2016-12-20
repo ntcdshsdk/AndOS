@@ -11,6 +11,7 @@ import com.osshare.andos.R;
 import com.osshare.andos.module.news.bean.News;
 import com.osshare.andos.module.news.bean.NewsResData;
 import com.osshare.andos.module.news.module.NewsModule;
+import com.osshare.core.view.pull.PullableLayout;
 import com.osshare.framework.base.BaseActivity;
 import com.osshare.framework.base.BaseAdapter;
 import com.osshare.framework.base.BaseViewHolder;
@@ -28,14 +29,30 @@ public class ImageSelectActivity extends BaseActivity {
     private static final int SELECT_MAX = 1;
     private static final int SELECT_MIN = 0;
 
+    private PullableLayout plContainer;
     private RecyclerView rvContent;
     private BaseAdapter<News> adapter;
+
+    private int num = 30;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_image_select);
 
+        plContainer = (PullableLayout) findViewById(R.id.pl_container);
+        plContainer.setOnPullListener(new PullableLayout.OnPullListener() {
+            @Override
+            public void onPullDown() {
+                num = 30;
+                getNetImages(num);
+            }
+
+            @Override
+            public void onPullUp() {
+                getNetImages(num += 10);
+            }
+        });
         rvContent = (RecyclerView) findViewById(R.id.rv_content);
         rvContent.setLayoutManager(new StaggeredGridLayoutManager(3, StaggeredGridLayoutManager.VERTICAL));
         adapter = new BaseAdapter<News>(ImageSelectActivity.this, null) {
@@ -48,7 +65,8 @@ public class ImageSelectActivity extends BaseActivity {
             public void onBindViewHolder(BaseViewHolder holder, int position) {
                 News itemBean = getItem(holder.getLayoutPosition());
                 ImageView ivImg = holder.getView(R.id.iv_img);
-                ImageLoader.loadImage(ImageSelectActivity.this,itemBean.getPicUrl(),ivImg);
+
+                ImageLoader.loadImage(ImageSelectActivity.this, itemBean.getPicUrl(), ivImg);
             }
         };
         rvContent.setAdapter(adapter);

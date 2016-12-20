@@ -10,9 +10,11 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 
 import com.osshare.andos.R;
+import com.osshare.andos.TestActivity;
 import com.osshare.andos.activity.ImageSelectActivity;
 import com.osshare.andos.module.ecb.ECBActivity;
 import com.osshare.andos.activity.IjkPlayerActivity;
+import com.osshare.andos.module.manager.ManagerActivity;
 import com.osshare.andos.module.news.NewsActivity;
 import com.osshare.andos.base.BaseFragment;
 import com.osshare.framework.base.BaseAdapter;
@@ -37,7 +39,8 @@ public class HomeFragment extends BaseFragment {
         View view = inflater.inflate(R.layout.fragment_main_home, container, false);
         rvContent = (RecyclerView) view.findViewById(R.id.rv_content);
         rvContent.setLayoutManager(new LinearLayoutManager(getActivity()));
-        adapter = new BaseAdapter<String>(getActivity(), Arrays.asList(new String[]{"news","ecb","video","other"})) {
+        adapter = new BaseAdapter<String>(getActivity(), Arrays.asList(
+                new String[]{"news","ecb","video","manager"})) {
             @Override
             public View getItemView(ViewGroup parent, int viewType) {
                 return inflater.inflate(R.layout.layout_item_main_home, parent, false);
@@ -50,7 +53,7 @@ public class HomeFragment extends BaseFragment {
                 tvModule.setText(itemBean);
             }
         };
-        adapter.setItemClickListener(new BaseAdapter.OnItemClickListener() {
+        adapter.setOnItemClickListener(new BaseAdapter.OnItemClickListener() {
             @Override
             public void onItemClick(ViewGroup parent, BaseViewHolder holder) {
                 String itemBean = adapter.getItem(holder.getLayoutPosition());
@@ -62,10 +65,10 @@ public class HomeFragment extends BaseFragment {
                         startActivity(new Intent(getActivity(),ECBActivity.class));
                         break;
                     case "video":
-                        startActivity(new Intent(getActivity(),IjkPlayerActivity.class));
+                        startActivity(new Intent(getActivity(),TestActivity.class));
                         break;
-                    case "other":
-                        startActivity(new Intent(getActivity(),ImageSelectActivity.class));
+                    case "manager":
+                        startActivity(new Intent(getActivity(),ManagerActivity.class));
                         break;
                 }
             }

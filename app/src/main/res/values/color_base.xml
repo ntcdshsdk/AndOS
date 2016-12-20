@@ -5,7 +5,6 @@
 
 
 
-
     <color name="text_black_common">#4A4A4A</color>
     <color name="text_grey_common">#4A4A4A</color>
     <color name="text_white_common">@color/white_common</color>

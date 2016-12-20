@@ -53,4 +53,5 @@ public class User extends BaseUser {
     public void setAvatar(String avatar) {
         this.avatar = avatar;
     }
+
 }

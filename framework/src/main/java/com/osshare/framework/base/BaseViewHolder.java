@@ -4,10 +4,12 @@ import android.support.v7.widget.RecyclerView;
 import android.util.SparseArray;
 import android.view.View;
 
+import com.osshare.core.view.recycler.RecyclerViewHolder;
+
 /**
  * Created by apple on 16/11/27.
  */
-public class BaseViewHolder extends RecyclerView.ViewHolder {
+public class BaseViewHolder extends RecyclerViewHolder {
     private SparseArray<View> views;
     private View.OnClickListener clickListener;
 

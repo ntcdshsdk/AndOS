@@ -45,7 +45,7 @@ public class SwipeMenuListView extends ListView {
     private int mDragState;
     private int currPosition;
     private View mCurrItemView;
-    private int itemRightWidth = (int) UIUtil.unit2px(getContext(), TypedValue.COMPLEX_UNIT_DIP, 70);
+    private int itemRightWidth = (int) UIUtil.dp2px(70);
     private int mTouchSlop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
 
     /**

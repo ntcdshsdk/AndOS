@@ -2,7 +2,7 @@ package com.osshare.andos.base;
 
 import android.content.Context;
 
-import com.osshare.andos.manager.AndOsApplication;
+import com.osshare.andos.manager.ImKkApplication;
 
 import java.util.concurrent.ExecutorService;
 
@@ -17,9 +17,9 @@ import dagger.Provides;
 
 @Module
 public class ApplicationModule {
-    private final AndOsApplication application;
+    private final ImKkApplication application;
 
-    public ApplicationModule(AndOsApplication application) {
+    public ApplicationModule(ImKkApplication application) {
         this.application = application;
     }
 

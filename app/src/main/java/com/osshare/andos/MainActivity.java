@@ -5,13 +5,12 @@ import android.app.FragmentManager;
 import android.app.FragmentTransaction;
 import android.os.Bundle;
 import android.widget.CompoundButton;
-import android.widget.RadioGroup;
 import android.widget.TextView;
 
 import com.osshare.andos.fragment.HomeFragment;
 import com.osshare.andos.fragment.OtherFragment;
 import com.osshare.andos.fragment.ProfileFragment;
-import com.osshare.core.view.single.BottomBarRadioGroup;
+import com.osshare.core.view.BottomBarRadioGroup;
 import com.osshare.framework.base.BaseActivity;
 
 /**

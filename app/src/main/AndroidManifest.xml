@@ -51,7 +51,7 @@
     <uses-feature android:name="android.hardware.camera.autofocus" />
 
     <application
-        android:name=".manager.AndOsApplication"
+        android:name=".manager.ImKkApplication"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -69,6 +69,7 @@
         <activity
             android:name=".MainActivity"
             android:label="主页"
+            android:alwaysRetainTaskState="true"
             android:launchMode="singleTask"/>
 
         <activity
@@ -80,6 +81,11 @@
             android:name=".RegisterActivity"
             android:label="注册"
             android:launchMode="singleTop"/>
+
+        <activity
+            android:name=".TestActivity"
+            android:label="测试"
+            android:launchMode="standard"/>
 
         <activity
             android:name=".module.news.NewsActivity"
@@ -100,6 +106,26 @@
         <activity
             android:name=".activity.ImageSelectActivity"
             android:label="图片选择" />
+
+        <activity
+            android:name=".activity.NoticeActivity"
+            android:label="公告页" />
+
+        <activity
+            android:name=".module.manager.ManagerActivity"
+            android:label="公告页" />
+
+        <activity
+            android:name=".module.manager.UserManagerActivity"
+            android:label="公告页" />
+
+        <activity
+            android:name=".module.manager.FuturesManagerActivity"
+            android:label="公告页" />
+
+        <activity
+            android:name=".module.manager.StockManagerActivity"
+            android:label="公告页" />
     </application>
 
 </manifest>

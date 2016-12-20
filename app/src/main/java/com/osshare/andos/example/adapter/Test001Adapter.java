@@ -48,8 +48,8 @@ public class Test001Adapter extends BaseAdapter {
         if (convertView == null) {
             holder = new ViewHolder();
             convertView = inflater.inflate(R.layout.item_test001, null);
-            holder.body = (TextView) convertView.findViewById(R.id.tv_body);
-            holder.button = (TextView) convertView.findViewById(R.id.tv_btn);
+//            holder.body = (TextView) convertView.findViewById(R.id.tv_body);
+//            holder.button = (TextView) convertView.findViewById(R.id.tv_btn);
 
             convertView.setTag(holder);
         } else {

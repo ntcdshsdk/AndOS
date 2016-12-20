@@ -1,16 +1,30 @@
 package com.osshare.andos;
 
+import android.animation.ObjectAnimator;
+import android.animation.PropertyValuesHolder;
+import android.app.IntentService;
+import android.app.PendingIntent;
+import android.app.Service;
 import android.content.Intent;
+import android.os.Binder;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.Message;
 import android.util.Log;
+import android.view.View;
 import android.view.WindowManager;
 
 import com.osshare.andos.bean.User;
 import com.osshare.andos.module.login.LoginActivity;
-import com.osshare.andos.manager.AndOsApplication;
+import com.osshare.andos.manager.ImKkApplication;
 import com.osshare.framework.base.BaseActivity;
+
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.Map;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class SplashActivity extends BaseActivity {
 
@@ -44,6 +58,9 @@ public class SplashActivity extends BaseActivity {
 
         init();
         animation();
+        View view;
+
+
 
     }
 
@@ -53,7 +70,7 @@ public class SplashActivity extends BaseActivity {
             public void run() {
                 try {
                     Thread.sleep(1000 * 2);
-                    AndOsApplication.getInstance().initUser();
+                    ImKkApplication.getInstance().initUser();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -72,7 +89,7 @@ public class SplashActivity extends BaseActivity {
             synchronized (SplashActivity.class) {
                 status = MASK;
 
-                User user = AndOsApplication.getInstance().getUser();
+                User user = ImKkApplication.getInstance().getUser();
 //                if (user != null && TextUtils.isEmpty(user.getPassword())) {
                     Intent intent = new Intent(SplashActivity.this, LoginActivity.class);
                     intent.putExtra("User", user);

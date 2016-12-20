@@ -8,6 +8,7 @@ import android.content.res.Resources;
 import android.os.Build;
 import android.text.TextUtils;
 import android.util.DisplayMetrics;
+import android.util.TypedValue;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -20,8 +21,8 @@ import java.util.Locale;
 public class Utils {
     public static void changeLanguage(Context context, String language) {
 
-        Resources resources = Resources.getSystem();
-        resources = context.getResources();
+//        Resources resources = Resources.getSystem();
+        Resources resources = context.getResources();
         Configuration config = resources.getConfiguration();
         DisplayMetrics metrics = resources.getDisplayMetrics();
         if (TextUtils.isEmpty(language)) {
@@ -68,5 +69,41 @@ public class Utils {
             e.printStackTrace();
         }
         return true;
+    }
+
+    /**
+     * 将value的unit转换为px
+     *
+     * @param unit  TypedValue
+     * @param value unit值
+     * @return px
+     */
+    public static float unit2px(int unit, float value,DisplayMetrics metrics) {
+        return TypedValue.applyDimension(unit, value, metrics);
+    }
+
+    /**
+     * 将value的px转换为unit
+     * @param unit
+     * @param value
+     * @param metrics
+     * @return
+     */
+    private static float px2unit(int unit, float value, DisplayMetrics metrics) {
+        switch (unit) {
+            case TypedValue.COMPLEX_UNIT_PX:
+                return value;
+            case TypedValue.COMPLEX_UNIT_DIP:
+                return value / metrics.density;
+            case TypedValue.COMPLEX_UNIT_SP:
+                return value / metrics.scaledDensity;
+            case TypedValue.COMPLEX_UNIT_PT:
+                return value / metrics.xdpi / (1.0f / 72);
+            case TypedValue.COMPLEX_UNIT_IN:
+                return value * metrics.xdpi;
+            case TypedValue.COMPLEX_UNIT_MM:
+                return value / metrics.xdpi / (1.0f / 25.4f);
+        }
+        return 0;
     }
 }

@@ -9,17 +9,29 @@
         android:id="@+id/layout_title_bar"
         layout="@layout/layout_title_bar_center" />
 
-    <android.support.v7.widget.RecyclerView
-        android:id="@+id/rv_content"
+    <EditText
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:focusable="true"
+        android:text="1111"/>
+    <com.osshare.core.view.AutoScrollTextView
+        android:id="@+id/tv_tips"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:ellipsize="marquee"
+        android:marqueeRepeatLimit="marquee_forever"
+        android:singleLine="true"
+        android:focusable="true"
+        android:focusableInTouchMode="true" />
+
+    <com.osshare.core.view.pull.PullLayout
+        android:id="@+id/pl_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
-
-    </android.support.v7.widget.RecyclerView>
-
-    <!--<android.support.design.widget.CoordinatorLayout-->
-    <!--android:layout_width="match_parent"-->
-    <!--android:layout_height="match_parent"-->
-    <!--android:fitsSystemWindows="true">-->
-    <!--</android.support.design.widget.CoordinatorLayout>-->
+        <android.support.v7.widget.RecyclerView
+            android:id="@+id/rv_content"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+    </com.osshare.core.view.pull.PullLayout>
 
 </LinearLayout>

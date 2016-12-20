@@ -1,9 +1,11 @@
 package com.osshare.andos.util;
 
 import android.content.Context;
+import android.content.res.Resources;
 import android.util.DisplayMetrics;
 import android.util.TypedValue;
 
+import com.osshare.andos.manager.ImKkApplication;
 import com.osshare.framework.manager.Constant;
 
 /**
@@ -18,8 +20,28 @@ public class UIUtil {
      * @param value unit值
      * @return px
      */
-    public static float unit2px(Context context,int unit, float value) {
-        return TypedValue.applyDimension(unit, value, getDisplayMetrics(context));
+    public static float unit2px(int unit, float value) {
+        return TypedValue.applyDimension(unit, value, getDisplayMetrics(ImKkApplication.getInstance()));
+    }
+
+    /**
+     * 将value的dp转换为px
+     *
+     * @param value unit值
+     * @return px
+     */
+    public static float dp2px(float value) {
+        return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value, getDisplayMetrics(ImKkApplication.getInstance()));
+    }
+
+    /**
+     * 将value的sp转换为px
+     *
+     * @param value unit值
+     * @return px
+     */
+    public static float sp2px(float value) {
+        return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, value, getDisplayMetrics(ImKkApplication.getInstance()));
     }
 
     /**
@@ -27,8 +49,8 @@ public class UIUtil {
      * @param value px值
      * @return unit
      */
-    public static float px2unit(Context context,int unit, float value) {
-        return px2unit(unit, value, getDisplayMetrics(context));
+    public static float px2unit(int unit, float value) {
+        return px2unit(unit, value, getDisplayMetrics(ImKkApplication.getInstance()));
     }
 
     private static float px2unit(int unit, float value, DisplayMetrics metrics) {
@@ -49,9 +71,13 @@ public class UIUtil {
         return 0;
     }
 
-    public static DisplayMetrics getDisplayMetrics(Context context) {
+    private static DisplayMetrics getDisplayMetrics(Context context) {
         if (Constant.METRICS == null) {
-            Constant.METRICS = context.getResources().getDisplayMetrics();
+            DisplayMetrics metrics = context.getResources().getDisplayMetrics();
+            if (metrics == null) {
+                metrics = Resources.getSystem().getDisplayMetrics();
+            }
+            Constant.METRICS = metrics;
         }
         return Constant.METRICS;
     }

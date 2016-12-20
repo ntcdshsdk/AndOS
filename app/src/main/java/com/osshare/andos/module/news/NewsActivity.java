@@ -2,10 +2,14 @@ package com.osshare.andos.module.news;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.support.design.widget.AppBarLayout;
+import android.support.design.widget.CollapsingToolbarLayout;
 import android.support.design.widget.CoordinatorLayout;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
+import android.view.CollapsibleActionView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
@@ -18,6 +22,9 @@ import com.osshare.andos.module.news.bean.News;
 import com.osshare.andos.module.news.bean.NewsResData;
 import com.osshare.andos.module.news.module.NewsModule;
 import com.osshare.andos.util.CharSeqUtil;
+import com.osshare.core.view.pull.DragPullLayout;
+import com.osshare.core.view.pull.PullLayout;
+import com.osshare.core.view.pull.PullableLayout;
 import com.osshare.framework.base.BaseActivity;
 import com.osshare.framework.base.BaseAdapter;
 import com.osshare.framework.base.BaseViewHolder;
@@ -33,12 +40,16 @@ import io.reactivex.disposables.Disposable;
  * Created by apple on 16/11/27.
  */
 public class NewsActivity extends BaseActivity {
-    //    CollapsibleActionView actionView;
-//    AppBarLayout barLayout; ✓
-//    CoordinatorLayout coordinatorLayout;
-//    CollapsingToolbarLayout toolbarLayout;
+        CollapsibleActionView actionView;
+    AppBarLayout barLayout; //✓
+    CoordinatorLayout coordinatorLayout;
+    CollapsingToolbarLayout toolbarLayout;
+    private PullLayout plContainer;
     private RecyclerView rvContent;
     private BaseAdapter<News> adapter;
+
+    private int pageNum = 15;
+    private int page = 1;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -46,6 +57,21 @@ public class NewsActivity extends BaseActivity {
         setContentView(R.layout.activity_news);
 
         ((TextView) findViewById(R.id.tv_title)).setText(R.string.module_news);
+        plContainer = (PullLayout) findViewById(R.id.pl_container);
+        plContainer.setOnPullListener(new PullLayout.OnPullListener() {
+            @Override
+            public void onPullDownRelease() {
+//                adapter.clearData();
+                page = 1;
+                getData();
+            }
+
+            @Override
+            public void onPullUpRelease() {
+                page++;
+                getData();
+            }
+        });
         rvContent = (RecyclerView) findViewById(R.id.rv_content);
         rvContent.setLayoutManager(new LinearLayoutManager(NewsActivity.this));
         adapter = new BaseAdapter<News>(NewsActivity.this, null) {
@@ -63,12 +89,12 @@ public class NewsActivity extends BaseActivity {
                 TextView tvDescription = holder.getView(R.id.tv_description);
                 TextView tvDate = holder.getView(R.id.tv_date);
 
-                String imgUrl=itemBean.getPicUrl();
-                if(CharSeqUtil.isEmpty(imgUrl)){
+                String imgUrl = itemBean.getPicUrl();
+                if (CharSeqUtil.isEmpty(imgUrl)) {
                     ivPic.setVisibility(View.GONE);
-                }else{
+                } else {
                     ivPic.setVisibility(View.VISIBLE);
-                    ImageLoader.loadImage(NewsActivity.this,imgUrl,ivPic);
+                    ImageLoader.loadImage(NewsActivity.this, imgUrl, ivPic);
                 }
 
                 tvTitle.setText(itemBean.getTitle());
@@ -76,21 +102,25 @@ public class NewsActivity extends BaseActivity {
                 tvDate.setText(itemBean.getCtime());
             }
         };
-        adapter.setItemClickListener(new BaseAdapter.OnItemClickListener() {
+        adapter.setOnItemClickListener(new BaseAdapter.OnItemClickListener() {
             @Override
             public void onItemClick(ViewGroup parent, BaseViewHolder holder) {
-                Intent intent=new Intent(NewsActivity.this, WebViewActivity.class);
-                intent.putExtra(Constant.KEY_URL,adapter.getItem(holder.getLayoutPosition()).getUrl());
+                Intent intent = new Intent(NewsActivity.this, WebViewActivity.class);
+                intent.putExtra(Constant.KEY_URL, adapter.getItem(holder.getLayoutPosition()).getUrl());
                 startActivity(intent);
             }
         });
         rvContent.setAdapter(adapter);
 
         getData();
+
+        TextView tvTips= (TextView) findViewById(R.id.tv_tips);
+        tvTips.setText("efeenrv测1试jfjejenefeenrv测2试jfjejenefeenrv测3试jfjejenefeenrv测4试jfjejenefeenrv测5试jfjejenefeenrv测6试jfjejenefeenrv测7试jfjejenefeenrv测试jfjejenefeenrv测试jfjejenefeenrv测试jfjejenefeenrv测试jfjejenefeenrv测试jfjejen");
+
     }
 
     private void getData() {
-        NewsModule.getWordNews(15, 1, new Observer<NewsResData>() {
+        NewsModule.getWordNews(pageNum, page, new Observer<NewsResData>() {
             @Override
             public void onSubscribe(Disposable d) {
                 Log.i(TAG, "onSubscribe" + d.isDisposed());
@@ -111,12 +141,18 @@ public class NewsActivity extends BaseActivity {
             @Override
             public void onComplete() {
                 Log.i(TAG, "onComplete");
+                new Handler().postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+//                        plContainer.setPullResult(false, false);
+                    }
+                }, 2000);
             }
         });
     }
 
     public void onGetNewsSuccess(List<News> data) {
-        adapter.setData(data);
+        adapter.addData(data);
     }
 
 

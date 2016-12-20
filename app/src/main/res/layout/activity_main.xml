@@ -9,6 +9,12 @@
         android:id="@+id/layout_title_bar"
         layout="@layout/layout_title_bar_main"/>
 
+    <TextView
+        android:id="@+id/tv_notice"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone"/>
+
     <FrameLayout
         android:id="@+id/fl_container"
         android:layout_width="match_parent"
@@ -18,7 +24,7 @@
     </FrameLayout>
 
 
-    <com.osshare.core.view.single.BottomBarRadioGroup
+    <com.osshare.core.view.BottomBarRadioGroup
         android:id="@+id/nrg_bottom_bar"
         android:orientation="horizontal"
         android:layout_width="match_parent"
@@ -64,5 +70,5 @@
                 android:drawableTop="@drawable/selector_img_main_profile"
                 android:text="我的"/>
         </LinearLayout>
-    </com.osshare.core.view.single.BottomBarRadioGroup>
+    </com.osshare.core.view.BottomBarRadioGroup>
 </LinearLayout>

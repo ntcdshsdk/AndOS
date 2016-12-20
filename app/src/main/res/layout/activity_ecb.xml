@@ -16,6 +16,7 @@
         android:visibility="gone" />
 
     <com.osshare.core.view.pull.PullableLayout
+        android:id="@+id/pl_container"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
