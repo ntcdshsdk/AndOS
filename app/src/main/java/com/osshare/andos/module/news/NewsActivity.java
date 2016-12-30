@@ -1,6 +1,7 @@
 package com.osshare.andos.module.news;
 
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
 import android.support.design.widget.AppBarLayout;
@@ -18,11 +19,12 @@ import android.widget.TextView;
 import com.google.gson.Gson;
 import com.osshare.andos.R;
 import com.osshare.andos.activity.WebViewActivity;
+import com.osshare.andos.base.abs.AbsActivity;
+import com.osshare.andos.bean.User;
 import com.osshare.andos.module.news.bean.News;
 import com.osshare.andos.module.news.bean.NewsResData;
 import com.osshare.andos.module.news.module.NewsModule;
 import com.osshare.andos.util.CharSeqUtil;
-import com.osshare.core.view.pull.DragPullLayout;
 import com.osshare.core.view.pull.PullLayout;
 import com.osshare.core.view.pull.PullableLayout;
 import com.osshare.framework.base.BaseActivity;
@@ -30,21 +32,28 @@ import com.osshare.framework.base.BaseAdapter;
 import com.osshare.framework.base.BaseViewHolder;
 import com.osshare.framework.manager.Constant;
 import com.osshare.framework.util.ImageLoader;
+import com.osshare.framework.util.RxEventBus;
+import com.osshare.framework.util.RxUtil;
+
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 
 import java.util.List;
 
+import io.reactivex.Flowable;
+import io.reactivex.Observable;
 import io.reactivex.Observer;
 import io.reactivex.disposables.Disposable;
 
 /**
  * Created by apple on 16/11/27.
  */
-public class NewsActivity extends BaseActivity {
+public class NewsActivity extends AbsActivity {
         CollapsibleActionView actionView;
     AppBarLayout barLayout; //✓
     CoordinatorLayout coordinatorLayout;
     CollapsingToolbarLayout toolbarLayout;
-    private PullLayout plContainer;
+    private PullableLayout plContainer;
     private RecyclerView rvContent;
     private BaseAdapter<News> adapter;
 
@@ -55,23 +64,27 @@ public class NewsActivity extends BaseActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_news);
+        immersiveHeaderContainer(R.id.layout_title_bar);
 
         ((TextView) findViewById(R.id.tv_title)).setText(R.string.module_news);
-        plContainer = (PullLayout) findViewById(R.id.pl_container);
-        plContainer.setOnPullListener(new PullLayout.OnPullListener() {
-            @Override
-            public void onPullDownRelease() {
-//                adapter.clearData();
-                page = 1;
-                getData();
-            }
-
-            @Override
-            public void onPullUpRelease() {
-                page++;
-                getData();
-            }
-        });
+        plContainer = (PullableLayout) findViewById(R.id.pl_container);
+        View mBottomView = new ImageView(this);
+        mBottomView.setBackgroundColor(Color.GREEN);
+        plContainer.setFooterView(mBottomView);
+//        plContainer.s(new PullLayout.OnPullListener() {
+//            @Override
+//            public void onPullDownRelease() {
+////                adapter.clearData();
+//                page = 1;
+//                getData();
+//            }
+//
+//            @Override
+//            public void onPullUpRelease() {
+//                page++;
+//                getData();
+//            }
+//        });
         rvContent = (RecyclerView) findViewById(R.id.rv_content);
         rvContent.setLayoutManager(new LinearLayoutManager(NewsActivity.this));
         adapter = new BaseAdapter<News>(NewsActivity.this, null) {
@@ -112,11 +125,10 @@ public class NewsActivity extends BaseActivity {
         });
         rvContent.setAdapter(adapter);
 
+        User user=new User();user.setName("user");
+        RxEventBus.getInstance().publish(user);
+        RxEventBus.getInstance().publish("111");
         getData();
-
-        TextView tvTips= (TextView) findViewById(R.id.tv_tips);
-        tvTips.setText("efeenrv测1试jfjejenefeenrv测2试jfjejenefeenrv测3试jfjejenefeenrv测4试jfjejenefeenrv测5试jfjejenefeenrv测6试jfjejenefeenrv测7试jfjejenefeenrv测试jfjejenefeenrv测试jfjejenefeenrv测试jfjejenefeenrv测试jfjejenefeenrv测试jfjejen");
-
     }
 
     private void getData() {

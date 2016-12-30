@@ -4,4 +4,10 @@
         <attr name="line" format="reference"/>
         <attr name="target" format="reference"/>
     </declare-styleable>
+
+
+    <!--<declare-styleable name="MyTestView">-->
+        <!--<attr name="line" format="reference"/>-->
+        <!--<attr name="target" format="reference"/>-->
+    <!--</declare-styleable>-->
 </resources>

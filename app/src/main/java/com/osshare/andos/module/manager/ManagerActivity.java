@@ -3,7 +3,6 @@ package com.osshare.andos.module.manager;
 import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
-import android.support.v7.widget.DefaultItemAnimator;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.view.View;
@@ -12,8 +11,10 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.osshare.andos.R;
+import com.osshare.andos.base.abs.AbsActivity;
 import com.osshare.andos.module.manager.bean.WealthInvestment;
 import com.osshare.andos.util.UIUtil;
+import com.osshare.core.view.pull.temp.MXLayout;
 import com.osshare.core.view.recycler.DividerItemDecoration;
 import com.osshare.framework.base.BaseActivity;
 import com.osshare.framework.base.BaseAdapter;
@@ -26,7 +27,8 @@ import java.util.List;
 /**
  * Created by apple on 16/12/11.
  */
-public class ManagerActivity extends BaseActivity {
+public class ManagerActivity extends AbsActivity {
+    private MXLayout plContainer;
     private RecyclerView rvContent;
     private BaseAdapter<WealthInvestment> adapter;
 
@@ -62,6 +64,7 @@ public class ManagerActivity extends BaseActivity {
             data.add(itemBeanx);
         }
 
+        plContainer = (MXLayout) findViewById(R.id.pl_container);
         rvContent = (RecyclerView) findViewById(R.id.rv_content);
         int dlr = (int) UIUtil.dp2px(12);
         rvContent.addItemDecoration(new DividerItemDecoration.Builder().color(Color.LTGRAY)

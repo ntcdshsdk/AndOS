@@ -1,173 +1,205 @@
 package com.osshare.core.view.pull;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.ValueAnimator;
+import android.annotation.TargetApi;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.RectF;
+import android.os.Build;
+import android.os.Handler;
 import android.support.v4.view.MotionEventCompat;
 import android.support.v4.view.ViewCompat;
+import android.support.v4.widget.NestedScrollView;
 import android.support.v4.widget.SwipeRefreshLayout;
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
+import android.support.v7.widget.StaggeredGridLayoutManager;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
-import android.util.Log;
+import android.view.Display;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
-import android.view.animation.AccelerateInterpolator;
+import android.view.WindowManager;
 import android.view.animation.Animation;
-import android.view.animation.Animation.AnimationListener;
 import android.view.animation.DecelerateInterpolator;
 import android.view.animation.Transformation;
+import android.widget.AbsListView;
+import android.widget.RelativeLayout;
+import android.widget.ScrollView;
 
+/**
+ * Created by apple on 16/12/15.
+ */
 public class PullableLayout extends ViewGroup {
-    private static final String TAG = PullableLayout.class.getSimpleName();
-
-    private static final long RETURN_TO_ORIGINAL_POSITION_TIMEOUT = 300;
-    private static final float ACCELERATE_INTERPOLATION_FACTOR = 1.5f;
-    private static final float DECELERATE_INTERPOLATION_FACTOR = 2f;
-    private static final int INVALID_POINTER = -1;
-
-
-    private static final int PULL_STATE_RESET = 0;
-    private static final int STATE_PULLING_DOWN = 1;
-    private static final int STATE_PULLING_UP = 2;
-    private static final float DRAG_RATE = .5f;
-    private int mPullState = 0;
-    //临界值即：release 后会执行刷新的下拉或上拉高度
-    private float tippingHeight;
-
-    private PullProgressBar mPullDownProgressBar;
-    private PullProgressBar mPullUpProgressBar;
-    private View mTarget;
-    private OnPullListener mPullListener;
-    private boolean mPullingDown = false;
-    private boolean mPullingUp = false;
-
-
     private SwipeRefreshLayout refreshLayout;
-    private int mOriginalOffsetTop;
-    private int mFrom;
+    private static final int INVALID_POINTER = -1;
+    private static final float DRAG_RATE = .5f;
+
+    private static final int HEADER_VIEW_HEIGHT = 50;
+    private static final float DECELERATE_INTERPOLATION_FACTOR = 2f;
+    private static final int SCALE_DOWN_DURATION = 150;
+    private static final int ANIMATE_TO_TRIGGER_DURATION = 200;
+    private static final int ANIMATE_TO_START_DURATION = 200;
+    private static final int DEFAULT_CIRCLE_TARGET = 64;
+
+    private View mTarget;
+
+    private OnPullRefreshListener mListener;// 下拉刷新listener
+    private OnPullLoadMoreListener mPullLoadMoreListener;// 上拉加载更多
+
+    private boolean mRefreshing = false;
+    private boolean mLoadMore = false;
     private int mTouchSlop;
+    private float mTotalDragDistance = -1;
     private int mMediumAnimationDuration;
-    private float mFromPercentage = 0;
-    private float mCurrPercentage = 0;
     private int mCurrentTargetOffsetTop;
+    private boolean mOriginalOffsetCalculated = false;
 
     private float mInitialMotionY;
-    private float mLastMotionY;
     private boolean mIsBeingDragged;
     private int mActivePointerId = INVALID_POINTER;
+    private boolean mScale;
 
-    // Target is returning to its start offset because it was cancelled or a
-    // refresh was triggered.
     private boolean mReturningToStart;
     private final DecelerateInterpolator mDecelerateInterpolator;
-    private final AccelerateInterpolator mAccelerateInterpolator;
-    private static final int[] LAYOUT_ATTRS = new int[]{
-            android.R.attr.enabled
-    };
-    private Mode mMode = Mode.getDefault();
-    //之前手势的方向，为了解决同一个触点前后移动方向不同导致后一个方向会刷新的问题，
-    //这里Mode.DISABLED无意义，只是一个初始值，和上拉/下拉方向进行区分
-    private Mode mLastDirection = Mode.DISABLED;
-    private int mDirection = 0;
-    //当子控件移动到尽头时才开始计算初始点的位置
-    private float mStartPoint;
+    private static final int[] LAYOUT_ATTRS = new int[]{android.R.attr.enabled};
 
+    private HeadViewContainer mHeadViewContainer;
+    private RelativeLayout mFooterViewContainer;
+    private int mHeaderViewIndex = -1;
+    private int mFooterViewIndex = -1;
 
-    //对下拉或上拉进行复位
-    private final Animation mAnimateToStartPosition = new Animation() {
+    protected int mFrom;
+
+    private float mStartingScale;
+
+    protected int mOriginalOffsetTop;
+
+    private Animation mScaleAnimation;
+
+    private Animation mScaleDownAnimation;
+
+    private Animation mScaleDownToStartAnimation;
+
+    // 最后停顿时的偏移量px，与DEFAULT_CIRCLE_TARGET正比
+    private float mSpinnerFinalOffset;
+
+    private boolean mNotify;
+
+    private int mHeaderViewWidth;// headerView的宽度
+
+    private int mFooterViewWidth;
+
+    private int mHeaderViewHeight;
+
+    private int mFooterViewHeight;
+
+    private boolean mUsingCustomStart;
+
+    private boolean targetScrollWithLayout = true;
+
+    private int pushDistance = 0;
+
+    private CircleProgressView defaultProgressView = null;
+
+    private boolean usingDefaultHeader = true;
+
+    private float density = 1.0f;
+
+    private boolean isProgressEnable = true;
+
+    /**
+     * 下拉时，超过距离之后，弹回来的动画监听器
+     */
+    private Animation.AnimationListener mRefreshListener = new Animation.AnimationListener() {
         @Override
-        public void applyTransformation(float interpolatedTime, Transformation t) {
-            int targetTop = 0;
-            if (mFrom != mOriginalOffsetTop) {
-                targetTop = (mFrom + (int) ((mOriginalOffsetTop - mFrom) * interpolatedTime));
-            }
-            int offset = targetTop - mTarget.getTop();
-            setTargetOffsetTopAndBottom(offset);
+        public void onAnimationStart(Animation animation) {
+            isProgressEnable = false;
         }
-    };
 
-    //设置上方进度条的完成度百分比
-    private Animation mShrinkTrigger = new Animation() {
         @Override
-        public void applyTransformation(float interpolatedTime, Transformation t) {
-            float percent = mFromPercentage + ((0 - mFromPercentage) * interpolatedTime);
-            mPullDownProgressBar.setTriggerPercentage(percent);
+        public void onAnimationRepeat(Animation animation) {
         }
-    };
 
-    //设置下方进度条的完成度百分比
-    private Animation mShrinkTriggerBottom = new Animation() {
-        @Override
-        public void applyTransformation(float interpolatedTime, Transformation t) {
-            float percent = mFromPercentage + ((0 - mFromPercentage) * interpolatedTime);
-            mPullUpProgressBar.setTriggerPercentage(percent);
-        }
-    };
-
-    //监听，回复初始位置
-    private final AnimationListener mReturnToStartPositionListener = new BaseAnimationListener() {
         @Override
         public void onAnimationEnd(Animation animation) {
-            // Once the target content has returned to its start position, reset
-            // the target offset to 0
-            mCurrentTargetOffsetTop = 0;
-            mLastDirection = Mode.DISABLED;
-        }
-    };
-
-    //回复进度条百分比
-    private final AnimationListener mShrinkAnimationListener = new BaseAnimationListener() {
-        @Override
-        public void onAnimationEnd(Animation animation) {
-            mCurrPercentage = 0;
-        }
-    };
-
-    //回复初始位置
-    private final Runnable mReturnToStartPosition = new Runnable() {
-
-        @Override
-        public void run() {
-            mReturningToStart = true;
-            animateOffsetToStartPosition(mCurrentTargetOffsetTop + getPaddingTop(),
-                    mReturnToStartPositionListener);
-        }
-
-    };
-
-    // Cancel the refresh gesture and animate everything back to its original state.
-    private final Runnable mCancel = new Runnable() {
-
-        @Override
-        public void run() {
-            mReturningToStart = true;
-            if (mPullDownProgressBar != null || mPullUpProgressBar != null) {
-                mFromPercentage = mCurrPercentage;
-                if (mDirection > 0 && ((mMode == Mode.PULL_DOWN) || (mMode == Mode.BOTH))) {
-                    mShrinkTrigger.reset();
-                    mShrinkTrigger.setDuration(mMediumAnimationDuration);
-                    mShrinkTrigger.setAnimationListener(mShrinkAnimationListener);
-
-                    mShrinkTrigger.setInterpolator(mDecelerateInterpolator);
-                    startAnimation(mShrinkTrigger);
-                } else if (mDirection < 0 && ((mMode == Mode.PULL_UP) || (mMode == Mode.BOTH))) {
-                    mShrinkTriggerBottom.reset();
-                    mShrinkTriggerBottom.setDuration(mMediumAnimationDuration);
-                    mShrinkTriggerBottom.setAnimationListener(mShrinkAnimationListener);
-
-                    mShrinkTriggerBottom.setInterpolator(mDecelerateInterpolator);
-                    startAnimation(mShrinkTriggerBottom);
+            isProgressEnable = true;
+            if (mRefreshing) {
+                if (mNotify) {
+                    if (usingDefaultHeader) {
+                        ViewCompat.setAlpha(defaultProgressView, 1.0f);
+                        defaultProgressView.setOnDraw(true);
+                        new Thread(defaultProgressView).start();
+                    }
+                    if (mListener != null) {
+                        mListener.onRefresh();
+                    }
+                }
+            } else {
+                mHeadViewContainer.setVisibility(View.GONE);
+                if (mScale) {
+                    setAnimationProgress(0);
+                } else {
+                    setTargetOffsetTopAndBottom(mOriginalOffsetTop
+                            - mCurrentTargetOffsetTop, true);
                 }
             }
-            mDirection = 0;
-            animateOffsetToStartPosition(mCurrentTargetOffsetTop + getPaddingTop(),
-                    mReturnToStartPositionListener);
+            mCurrentTargetOffsetTop = mHeadViewContainer.getTop();
+            updateListenerCallBack();
         }
-
     };
 
+    /**
+     * 更新回调
+     */
+    private void updateListenerCallBack() {
+        int distance = mCurrentTargetOffsetTop + mHeadViewContainer.getHeight();
+        if (mListener != null) {
+            mListener.onPullDistance(distance);
+        }
+        if (usingDefaultHeader && isProgressEnable) {
+            defaultProgressView.setPullDistance(distance);
+        }
+    }
+
+    /**
+     * 添加头布局
+     *
+     * @param child
+     */
+    public void setHeaderView(View child) {
+        if (child == null) {
+            return;
+        }
+        if (mHeadViewContainer == null) {
+            return;
+        }
+        usingDefaultHeader = false;
+        mHeadViewContainer.removeAllViews();
+        RelativeLayout.LayoutParams layoutParams = new RelativeLayout.LayoutParams(
+                mHeaderViewWidth, mHeaderViewHeight);
+        layoutParams.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
+        mHeadViewContainer.addView(child, layoutParams);
+    }
+
+    public void setFooterView(View child) {
+        if (child == null) {
+            return;
+        }
+        if (mFooterViewContainer == null) {
+            return;
+        }
+        mFooterViewContainer.removeAllViews();
+        RelativeLayout.LayoutParams layoutParams = new RelativeLayout.LayoutParams(
+                mFooterViewWidth, mFooterViewHeight);
+        mFooterViewContainer.addView(child, layoutParams);
+    }
 
     public PullableLayout(Context context) {
         this(context, null);
@@ -175,173 +207,411 @@ public class PullableLayout extends ViewGroup {
 
     public PullableLayout(Context context, AttributeSet attrs) {
         super(context, attrs);
+
         mTouchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
-        mMediumAnimationDuration = getResources().getInteger(android.R.integer.config_mediumAnimTime);
+
+        mMediumAnimationDuration = getResources().getInteger(
+                android.R.integer.config_mediumAnimTime);
 
         setWillNotDraw(false);
+        mDecelerateInterpolator = new DecelerateInterpolator(
+                DECELERATE_INTERPOLATION_FACTOR);
 
         final TypedArray a = context.obtainStyledAttributes(attrs, LAYOUT_ATTRS);
         setEnabled(a.getBoolean(0, true));
         a.recycle();
 
-        tippingHeight = 75 * getDisplayMetrics(context).density;
-
-
-        mPullDownProgressBar = new PullProgressBar(this);
-        mPullDownProgressBar.setColorScheme(
-                getResources().getColor(android.R.color.holo_blue_bright),
-                getResources().getColor(android.R.color.holo_green_light),
-                getResources().getColor(android.R.color.holo_orange_light),
-                getResources().getColor(android.R.color.holo_red_light));
-
-        mPullUpProgressBar = new PullProgressBar(this);
-        mPullUpProgressBar.setColorScheme(
-                getResources().getColor(android.R.color.holo_blue_bright),
-                getResources().getColor(android.R.color.holo_green_light),
-                getResources().getColor(android.R.color.holo_orange_light),
-                getResources().getColor(android.R.color.holo_red_light));
-
-        mDecelerateInterpolator = new DecelerateInterpolator(DECELERATE_INTERPOLATION_FACTOR);
-        mAccelerateInterpolator = new AccelerateInterpolator(ACCELERATE_INTERPOLATION_FACTOR);
-
-
+        WindowManager wm = (WindowManager) context
+                .getSystemService(Context.WINDOW_SERVICE);
+        Display display = wm.getDefaultDisplay();
+        final DisplayMetrics metrics = getResources().getDisplayMetrics();
+        mHeaderViewWidth = (int) display.getWidth();
+        mFooterViewWidth = (int) display.getWidth();
+        mHeaderViewHeight = (int) (HEADER_VIEW_HEIGHT * metrics.density);
+        mFooterViewHeight = (int) (HEADER_VIEW_HEIGHT * metrics.density);
+        defaultProgressView = new CircleProgressView(getContext());
+        createHeaderViewContainer();
+        createFooterViewContainer();
+        ViewCompat.setChildrenDrawingOrderEnabled(this, true);
+        mSpinnerFinalOffset = DEFAULT_CIRCLE_TARGET * metrics.density;
+        density = metrics.density;
+        mTotalDragDistance = mSpinnerFinalOffset;
     }
 
+    /**
+     * 孩子节点绘制的顺序
+     *
+     * @param childCount
+     * @param i
+     * @return
+     */
     @Override
-    public void onAttachedToWindow() {
-        super.onAttachedToWindow();
-        removeCallbacks(mCancel);
-        removeCallbacks(mReturnToStartPosition);
-    }
-
-    @Override
-    public void onDetachedFromWindow() {
-        super.onDetachedFromWindow();
-        removeCallbacks(mReturnToStartPosition);
-        removeCallbacks(mCancel);
-    }
-
-    //对子控件进行移动
-    private void animateOffsetToStartPosition(int from, AnimationListener listener) {
-        mFrom = from;
-        mAnimateToStartPosition.reset();
-        mAnimateToStartPosition.setDuration(mMediumAnimationDuration);
-        mAnimateToStartPosition.setAnimationListener(listener);
-        mAnimateToStartPosition.setInterpolator(mDecelerateInterpolator);
-        mTarget.startAnimation(mAnimateToStartPosition);
-    }
-
-
-    //设置进度条的显示百分比
-    private void setTriggerPercentage(float percent) {
-        if (percent == 0f) {
-            // No-op. A null trigger means it's uninitialized, and setting it to zero-percent
-            // means we're trying to reset state, so there's nothing to reset in this case.
-            mCurrPercentage = 0;
-            return;
+    protected int getChildDrawingOrder(int childCount, int i) {
+        // 将新添加的View,放到最后绘制
+        if (mHeaderViewIndex < 0 && mFooterViewIndex < 0) {
+            return i;
         }
-        mCurrPercentage = percent;
-        if (((mMode == Mode.PULL_DOWN) || (mMode == Mode.BOTH))
-                && mLastDirection != Mode.PULL_UP && !mPullingUp) {
-            mPullDownProgressBar.setTriggerPercentage(percent);
-        } else if (((mMode == Mode.PULL_UP) || (mMode == Mode.BOTH))
-                && mLastDirection != Mode.PULL_DOWN && !mPullingDown) {
-            mPullUpProgressBar.setTriggerPercentage(percent);
+        if (i == childCount - 2) {
+            return mHeaderViewIndex;
         }
+        if (i == childCount - 1) {
+            return mFooterViewIndex;
+        }
+        int bigIndex = mFooterViewIndex > mHeaderViewIndex ? mFooterViewIndex
+                : mHeaderViewIndex;
+        int smallIndex = mFooterViewIndex < mHeaderViewIndex ? mFooterViewIndex
+                : mHeaderViewIndex;
+        if (i >= smallIndex && i < bigIndex - 1) {
+            return i + 1;
+        }
+        if (i >= bigIndex || (i == bigIndex - 1)) {
+            return i + 2;
+        }
+        return i;
     }
 
-    public void setPullingDown(boolean pullingDown) {
-        if (mPullingDown != pullingDown) {
-            ensureTarget();
-            mCurrPercentage = 0;
-            mPullingDown = pullingDown;
-            if (mPullingDown) {
-                mPullDownProgressBar.start();
+    /**
+     * 创建头布局的容器
+     */
+    private void createHeaderViewContainer() {
+        RelativeLayout.LayoutParams layoutParams = new RelativeLayout.LayoutParams(
+                (int) (mHeaderViewHeight * 0.8),
+                (int) (mHeaderViewHeight * 0.8));
+        layoutParams.addRule(RelativeLayout.CENTER_HORIZONTAL);
+        layoutParams.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
+        mHeadViewContainer = new HeadViewContainer(getContext());
+        mHeadViewContainer.setVisibility(View.GONE);
+        defaultProgressView.setVisibility(View.VISIBLE);
+        defaultProgressView.setOnDraw(false);
+        mHeadViewContainer.addView(defaultProgressView, layoutParams);
+        addView(mHeadViewContainer);
+    }
+
+    /**
+     * 添加底部布局
+     */
+    private void createFooterViewContainer() {
+        mFooterViewContainer = new RelativeLayout(getContext());
+        mFooterViewContainer.setVisibility(View.GONE);
+        addView(mFooterViewContainer);
+    }
+
+    /**
+     * 设置
+     *
+     * @param listener
+     */
+    public void setOnPullRefreshListener(OnPullRefreshListener listener) {
+        mListener = listener;
+    }
+
+    public void setHeaderViewBackgroundColor(int color) {
+        mHeadViewContainer.setBackgroundColor(color);
+    }
+
+    /**
+     * 设置上拉加载更多的接口
+     *
+     * @param onPullLoadMoreListener
+     */
+    public void setOnPushLoadMoreListener(
+            OnPullLoadMoreListener onPullLoadMoreListener) {
+        this.mPullLoadMoreListener = onPullLoadMoreListener;
+    }
+
+    /**
+     * Notify the widget that refresh state has changed. Do not call this when
+     * refresh is triggered by a swipe gesture.
+     *
+     * @param refreshing Whether or not the view should show refresh progress.
+     */
+    public void setRefreshing(boolean refreshing) {
+        if (refreshing && mRefreshing != refreshing) {
+            // scale and show
+            mRefreshing = refreshing;
+            int endTarget = 0;
+            if (!mUsingCustomStart) {
+                endTarget = (int) (mSpinnerFinalOffset + mOriginalOffsetTop);
             } else {
-                mLastDirection = Mode.DISABLED;
-                mPullDownProgressBar.stop();
+                endTarget = (int) mSpinnerFinalOffset;
+            }
+            setTargetOffsetTopAndBottom(endTarget - mCurrentTargetOffsetTop,
+                    true /* requires update */);
+            mNotify = false;
+            startScaleUpAnimation(mRefreshListener);
+        } else {
+            setRefreshing(refreshing, false /* notify */);
+            if (usingDefaultHeader) {
+                defaultProgressView.setOnDraw(false);
             }
         }
     }
 
-    public void setPullingUp(boolean pullingUp) {
-        if (mPullingUp != pullingUp) {
+    private void startScaleUpAnimation(Animation.AnimationListener listener) {
+        mHeadViewContainer.setVisibility(View.VISIBLE);
+        mScaleAnimation = new Animation() {
+            @Override
+            public void applyTransformation(float interpolatedTime,
+                                            Transformation t) {
+                setAnimationProgress(interpolatedTime);
+            }
+        };
+        mScaleAnimation.setDuration(mMediumAnimationDuration);
+        if (listener != null) {
+            mHeadViewContainer.setAnimationListener(listener);
+        }
+        mHeadViewContainer.clearAnimation();
+        mHeadViewContainer.startAnimation(mScaleAnimation);
+    }
+
+    private void setAnimationProgress(float progress) {
+        if (!usingDefaultHeader) {
+            progress = 1;
+        }
+        ViewCompat.setScaleX(mHeadViewContainer, progress);
+        ViewCompat.setScaleY(mHeadViewContainer, progress);
+    }
+
+    private void setRefreshing(boolean refreshing, final boolean notify) {
+        if (mRefreshing != refreshing) {
+            mNotify = notify;
             ensureTarget();
-            mCurrPercentage = 0;
-            mPullingUp = pullingUp;
-            if (mPullingUp) {
-                mPullUpProgressBar.start();
+            mRefreshing = refreshing;
+            if (mRefreshing) {
+                animateOffsetToCorrectPosition(mCurrentTargetOffsetTop,
+                        mRefreshListener);
             } else {
-                mLastDirection = Mode.DISABLED;
-                mPullUpProgressBar.stop();
+                //startScaleDownAnimation(mRefreshListener);
+                animateOffsetToStartPosition(mCurrentTargetOffsetTop, mRefreshListener);
             }
         }
     }
 
+    private void startScaleDownAnimation(Animation.AnimationListener listener) {
+        mScaleDownAnimation = new Animation() {
+            @Override
+            public void applyTransformation(float interpolatedTime,
+                                            Transformation t) {
+                setAnimationProgress(1 - interpolatedTime);
+            }
+        };
+        mScaleDownAnimation.setDuration(SCALE_DOWN_DURATION);
+        mHeadViewContainer.setAnimationListener(listener);
+        mHeadViewContainer.clearAnimation();
+        mHeadViewContainer.startAnimation(mScaleDownAnimation);
+    }
 
+    public boolean isRefreshing() {
+        return mRefreshing;
+    }
+
+    /**
+     * 确保mTarget不为空<br>
+     * mTarget一般是可滑动的ScrollView,ListView,RecyclerView等
+     */
     private void ensureTarget() {
-        // Don't bother getting the parent height if the parent hasn't been laid out yet.
         if (mTarget == null) {
-            if (getChildCount() > 1 && !isInEditMode()) {
-                throw new IllegalStateException(
-                        "SwipeRefreshLayout can host only one direct child");
+            for (int i = 0; i < getChildCount(); i++) {
+                View child = getChildAt(i);
+                if (!child.equals(mHeadViewContainer)
+                        && !child.equals(mFooterViewContainer)) {
+                    mTarget = child;
+                    break;
+                }
             }
-            mTarget = getChildAt(0);
-            mOriginalOffsetTop = mTarget.getTop() + getPaddingTop();
         }
     }
 
-    @Override
-    public void draw(Canvas canvas) {
-        super.draw(canvas);
-        mPullDownProgressBar.draw(canvas);
-        mPullUpProgressBar.draw(canvas);
+    /**
+     * Set the distance to trigger a sync in dips
+     *
+     * @param distance
+     */
+    public void setDistanceToTriggerSync(int distance) {
+        mTotalDragDistance = distance;
     }
 
     @Override
-    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+    protected void onLayout(boolean changed, int left, int top, int right,
+                            int bottom) {
         final int width = getMeasuredWidth();
         final int height = getMeasuredHeight();
-        mPullDownProgressBar.setBounds(0, 0, width, (int) tippingHeight);
         if (getChildCount() == 0) {
             return;
         }
-        final View child = getChildAt(0);
+        if (mTarget == null) {
+            ensureTarget();
+        }
+        if (mTarget == null) {
+            return;
+        }
+        int distance = mCurrentTargetOffsetTop + mHeadViewContainer.getMeasuredHeight();
+        if (!targetScrollWithLayout) {
+            // 判断标志位，如果目标View不跟随手指的滑动而滑动，将下拉偏移量设置为0
+            distance = 0;
+        }
+        final View child = mTarget;
         final int childLeft = getPaddingLeft();
-        final int childTop = mCurrentTargetOffsetTop + getPaddingTop();
+        final int childTop = getPaddingTop() + distance - pushDistance;// 根据偏移量distance更新
         final int childWidth = width - getPaddingLeft() - getPaddingRight();
         final int childHeight = height - getPaddingTop() - getPaddingBottom();
-        child.layout(childLeft, childTop, childLeft + childWidth, childTop + childHeight);
-        mPullUpProgressBar.setBounds(0, (int) (height - tippingHeight), width, height);
+        child.layout(childLeft, childTop, childLeft + childWidth, childTop
+                + childHeight);// 更新目标View的位置
+        int headViewWidth = mHeadViewContainer.getMeasuredWidth();
+        int headViewHeight = mHeadViewContainer.getMeasuredHeight();
+        mHeadViewContainer.layout((width / 2 - headViewWidth / 2),
+                mCurrentTargetOffsetTop, (width / 2 + headViewWidth / 2),
+                mCurrentTargetOffsetTop + headViewHeight);// 更新头布局的位置
+        int footViewWidth = mFooterViewContainer.getMeasuredWidth();
+        int footViewHeight = mFooterViewContainer.getMeasuredHeight();
+        mFooterViewContainer.layout((width / 2 - footViewWidth / 2), height
+                - pushDistance, (width / 2 + footViewWidth / 2), height
+                + footViewHeight - pushDistance);
     }
 
     @Override
     public void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-        if (getChildCount() > 1 && !isInEditMode()) {
-            throw new IllegalStateException("SwipeRefreshLayout can host only one direct child");
+        if (mTarget == null) {
+            ensureTarget();
         }
-        if (getChildCount() > 0) {
-            getChildAt(0).measure(
-                    MeasureSpec.makeMeasureSpec(
-                            getMeasuredWidth() - getPaddingLeft() - getPaddingRight(),
-                            MeasureSpec.EXACTLY),
-                    MeasureSpec.makeMeasureSpec(
-                            getMeasuredHeight() - getPaddingTop() - getPaddingBottom(),
-                            MeasureSpec.EXACTLY));
+        if (mTarget == null) {
+            return;
+        }
+        mTarget.measure(MeasureSpec.makeMeasureSpec(getMeasuredWidth()
+                        - getPaddingLeft() - getPaddingRight(), MeasureSpec.EXACTLY),
+                MeasureSpec.makeMeasureSpec(getMeasuredHeight()
+                                - getPaddingTop() - getPaddingBottom(),
+                        MeasureSpec.EXACTLY));
+        mHeadViewContainer.measure(MeasureSpec.makeMeasureSpec(
+                mHeaderViewWidth, MeasureSpec.EXACTLY), MeasureSpec
+                .makeMeasureSpec(3 * mHeaderViewHeight, MeasureSpec.EXACTLY));
+        mFooterViewContainer.measure(MeasureSpec.makeMeasureSpec(
+                mFooterViewWidth, MeasureSpec.EXACTLY), MeasureSpec
+                .makeMeasureSpec(mFooterViewHeight, MeasureSpec.EXACTLY));
+        if (!mUsingCustomStart && !mOriginalOffsetCalculated) {
+            mOriginalOffsetCalculated = true;
+            mCurrentTargetOffsetTop = mOriginalOffsetTop = -mHeadViewContainer
+                    .getMeasuredHeight();
+            updateListenerCallBack();
+        }
+        mHeaderViewIndex = -1;
+        for (int index = 0; index < getChildCount(); index++) {
+            if (getChildAt(index) == mHeadViewContainer) {
+                mHeaderViewIndex = index;
+                break;
+            }
+        }
+        mFooterViewIndex = -1;
+        for (int index = 0; index < getChildCount(); index++) {
+            if (getChildAt(index) == mFooterViewContainer) {
+                mFooterViewIndex = index;
+                break;
+            }
         }
     }
 
-    public boolean canChildScrollDown() {
-        return ViewCompat.canScrollVertically(mTarget, -1);
+    /**
+     * 判断目标View是否滑动到顶部-还能否继续滑动
+     *
+     * @return
+     */
+    public boolean isChildScrollToTop() {
+        if (Build.VERSION.SDK_INT < 14) {
+            if (mTarget instanceof AbsListView) {
+                final AbsListView absListView = (AbsListView) mTarget;
+                return !(absListView.getChildCount() > 0 && (absListView
+                        .getFirstVisiblePosition() > 0 || absListView
+                        .getChildAt(0).getTop() < absListView.getPaddingTop()));
+            } else {
+                return !(mTarget.getScrollY() > 0);
+            }
+        } else {
+            return !ViewCompat.canScrollVertically(mTarget, -1);
+        }
     }
 
-    public boolean canChildScrollUp() {
-        return ViewCompat.canScrollVertically(mTarget, 1);
+    /**
+     * 是否滑动到底部
+     *
+     * @return
+     */
+    public boolean isChildScrollToBottom() {
+        if (isChildScrollToTop()) {
+            return false;
+        }
+        if (mTarget instanceof RecyclerView) {
+            RecyclerView recyclerView = (RecyclerView) mTarget;
+            RecyclerView.LayoutManager layoutManager = recyclerView.getLayoutManager();
+            int count = recyclerView.getAdapter().getItemCount();
+            if (layoutManager instanceof LinearLayoutManager && count > 0) {
+                LinearLayoutManager linearLayoutManager = (LinearLayoutManager) layoutManager;
+                if (linearLayoutManager.findLastCompletelyVisibleItemPosition() == count - 1) {
+                    return true;
+                }
+            } else if (layoutManager instanceof StaggeredGridLayoutManager) {
+                StaggeredGridLayoutManager staggeredGridLayoutManager = (StaggeredGridLayoutManager) layoutManager;
+                int[] lastItems = new int[2];
+                staggeredGridLayoutManager
+                        .findLastCompletelyVisibleItemPositions(lastItems);
+                int lastItem = Math.max(lastItems[0], lastItems[1]);
+                if (lastItem == count - 1) {
+                    return true;
+                }
+            }
+            return false;
+        } else if (mTarget instanceof AbsListView) {
+            final AbsListView absListView = (AbsListView) mTarget;
+            int count = absListView.getAdapter().getCount();
+            int fristPos = absListView.getFirstVisiblePosition();
+            if (fristPos == 0
+                    && absListView.getChildAt(0).getTop() >= absListView
+                    .getPaddingTop()) {
+                return false;
+            }
+            int lastPos = absListView.getLastVisiblePosition();
+            if (lastPos > 0 && count > 0 && lastPos == count - 1) {
+                return true;
+            }
+            return false;
+        } else if (mTarget instanceof ScrollView) {
+            ScrollView scrollView = (ScrollView) mTarget;
+            View view = (View) scrollView
+                    .getChildAt(scrollView.getChildCount() - 1);
+            if (view != null) {
+                int diff = (view.getBottom() - (scrollView.getHeight() + scrollView
+                        .getScrollY()));
+                if (diff == 0) {
+                    return true;
+                }
+            }
+        } else if (mTarget instanceof NestedScrollView) {
+            NestedScrollView nestedScrollView = (NestedScrollView) mTarget;
+            View view = (View) nestedScrollView.getChildAt(nestedScrollView.getChildCount() - 1);
+            if (view != null) {
+                int diff = (view.getBottom() - (nestedScrollView.getHeight() + nestedScrollView.getScrollY()));
+                if (diff == 0) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
-    private boolean canChildScrollUp;
-    private boolean canChildScrollDown;
+    private float getMotionEventY(MotionEvent ev, int activePointerId) {
+        final int index = MotionEventCompat.findPointerIndex(ev,
+                activePointerId);
+        if (index < 0) {
+            return -1;
+        }
+        return MotionEventCompat.getY(ev, index);
+    }
+
+    @Override
+    public void requestDisallowInterceptTouchEvent(boolean b) {
+        // Nope.
+    }
+
 
     @Override
     public boolean onInterceptTouchEvent(MotionEvent ev) {
@@ -352,77 +622,41 @@ public class PullableLayout extends ViewGroup {
         if (mReturningToStart && action == MotionEvent.ACTION_DOWN) {
             mReturningToStart = false;
         }
-
-        if (!isEnabled() || mReturningToStart) {
-            // Fail fast if we're not in a state where a swipe is possible
+        if (!isEnabled() || mReturningToStart || mRefreshing || mLoadMore
+                || (!isChildScrollToTop() && !isChildScrollToBottom())) {
             return false;
         }
-
         switch (action) {
             case MotionEvent.ACTION_DOWN:
-                mLastMotionY = mInitialMotionY = ev.getY();
+                // 恢复HeaderView的初始位置
+                setTargetOffsetTopAndBottom(mOriginalOffsetTop - mHeadViewContainer.getTop(), true);
                 mActivePointerId = MotionEventCompat.getPointerId(ev, 0);
                 mIsBeingDragged = false;
-                mCurrPercentage = 0;
-                mStartPoint = mInitialMotionY;
-
-                canChildScrollUp = canChildScrollDown();
-                canChildScrollDown = canChildScrollUp();
+                final float initialMotionY = getMotionEventY(ev, mActivePointerId);
+                if (initialMotionY == -1) {
+                    return false;
+                }
+                mInitialMotionY = initialMotionY;// 记录按下的位置
                 break;
-
             case MotionEvent.ACTION_MOVE:
                 if (mActivePointerId == INVALID_POINTER) {
                     return false;
                 }
-                final int pointerIndex = MotionEventCompat.findPointerIndex(ev, mActivePointerId);
-                if (pointerIndex < 0) {
-                    Log.e(TAG, "Got ACTION_MOVE event but have an invalid active pointer id.");
+
+                final float y = getMotionEventY(ev, mActivePointerId);
+                if (y == -1) {
                     return false;
                 }
-
-                final float y = MotionEventCompat.getY(ev, pointerIndex);
-//                final float yDiff = y - mInitialMotionY;
-                final float yDiff = y - mStartPoint;
-                //若上个手势的方向和当前手势方向不一致，返回
-                if ((mLastDirection == Mode.PULL_DOWN && yDiff < 0)
-                        || (mLastDirection == Mode.PULL_UP && yDiff > 0)) {
-                    return false;
-                }
-                //下拉或上拉时，子控件本身能够滑动时，记录当前手指位置，当其滑动到尽头时，
-                //mStartPoint作为下拉刷新或上拉加载的手势起点
-                if ((canChildScrollDown() && yDiff > 0) || (canChildScrollUp() && yDiff < 0)) {
-                    mStartPoint = y;
-                }
-
-                //下拉
-                if (yDiff > mTouchSlop) {
-                    //若当前子控件能向下滑动，或者上个手势为上拉，则返回
-                    if (canChildScrollDown() || mLastDirection == Mode.PULL_UP) {
-                        mIsBeingDragged = false;
-                        return false;
+                float yDiff = 0;
+                if (isChildScrollToBottom()) {
+                    yDiff = mInitialMotionY - y;// 计算上拉距离
+                    if (yDiff > mTouchSlop && !mIsBeingDragged) {// 判断是否下拉的距离足够
+                        mIsBeingDragged = true;// 正在上拉
                     }
-                    if ((mMode == Mode.PULL_DOWN) || (mMode == Mode.BOTH)) {
-                        mLastMotionY = y;
-                        mIsBeingDragged = true;
-                        mLastDirection = Mode.PULL_DOWN;
-                    }
-                }
-                //上拉
-                else if (-yDiff > mTouchSlop) {
-                    //若当前子控件能向上滑动，或者上个手势为下拉，则返回
-                    if (canChildScrollUp() || mLastDirection == Mode.PULL_DOWN) {
-                        mIsBeingDragged = false;
-                        return false;
-                    }
-                    //若子控件不能上下滑动，说明数据不足一屏，若不满屏不加载，返回
-                    if (!canChildScrollUp && !canChildScrollDown) {
-                        mIsBeingDragged = false;
-                        return false;
-                    }
-                    if ((mMode == Mode.PULL_UP) || (mMode == Mode.BOTH)) {
-                        mLastMotionY = y;
-                        mIsBeingDragged = true;
-                        mLastDirection = Mode.PULL_UP;
+                } else {
+                    yDiff = y - mInitialMotionY;// 计算下拉距离
+                    if (yDiff > mTouchSlop && !mIsBeingDragged) {// 判断是否下拉的距离足够
+                        mIsBeingDragged = true;// 正在下拉
                     }
                 }
                 break;
@@ -434,20 +668,12 @@ public class PullableLayout extends ViewGroup {
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
                 mIsBeingDragged = false;
-                mCurrPercentage = 0;
                 mActivePointerId = INVALID_POINTER;
-                mLastDirection = Mode.DISABLED;
                 break;
         }
 
-        return mIsBeingDragged;
+        return mIsBeingDragged;// 如果正在拖动，则拦截子View的事件
     }
-
-    @Override
-    public void requestDisallowInterceptTouchEvent(boolean b) {
-        // Nope.
-    }
-
 
     @Override
     public boolean onTouchEvent(MotionEvent ev) {
@@ -456,69 +682,87 @@ public class PullableLayout extends ViewGroup {
         if (mReturningToStart && action == MotionEvent.ACTION_DOWN) {
             mReturningToStart = false;
         }
-
-        if (!isEnabled() || mReturningToStart) {
-            // Fail fast if we're not in a state where a swipe is possible
+        if (!isEnabled() || mReturningToStart
+                || (!isChildScrollToTop() && !isChildScrollToBottom())) {
+            // 如果子View可以滑动，不拦截事件，交给子View处理
             return false;
         }
 
+        if (isChildScrollToBottom()) {// 上拉加载更多
+            return handlerPushTouchEvent(ev, action);
+        } else {// 下拉刷新
+            return handlerPullTouchEvent(ev, action);
+        }
+    }
+
+    private boolean handlerPullTouchEvent(MotionEvent ev, int action) {
         switch (action) {
             case MotionEvent.ACTION_DOWN:
                 mActivePointerId = MotionEventCompat.getPointerId(ev, 0);
                 mIsBeingDragged = false;
-
-                mLastMotionY = mInitialMotionY = ev.getY();
-                mCurrPercentage = 0;
-                mStartPoint = mInitialMotionY;
                 break;
 
-            case MotionEvent.ACTION_MOVE:
-                final int pointerIndex = MotionEventCompat.findPointerIndex(ev, mActivePointerId);
+            case MotionEvent.ACTION_MOVE: {
+                final int pointerIndex = MotionEventCompat.findPointerIndex(ev,
+                        mActivePointerId);
                 if (pointerIndex < 0) {
-                    Log.e(TAG, "Got ACTION_MOVE event but have an invalid active pointer id.");
                     return false;
                 }
 
                 final float y = MotionEventCompat.getY(ev, pointerIndex);
-                final float yDiff = (y - mStartPoint) * DRAG_RATE;
-
-                if ((mLastDirection == Mode.PULL_DOWN && yDiff < 0) ||
-                        (mLastDirection == Mode.PULL_UP && yDiff > 0)) {
-                    return true;
-                }
-
-                if (!mIsBeingDragged && (yDiff > 0 && mLastDirection == Mode.PULL_DOWN)
-                        || (yDiff < 0 && mLastDirection == Mode.PULL_UP)) {
-                    mIsBeingDragged = true;
-                }
+                final float overscrollTop = (y - mInitialMotionY) * DRAG_RATE;
                 if (mIsBeingDragged) {
-                    if (!canChildScrollUp && !canChildScrollDown && yDiff < 0) {
-                        return true;
+                    float originalDragPercent = overscrollTop / mTotalDragDistance;
+                    if (originalDragPercent < 0) {
+                        return false;
                     }
-                    // Just track the user's movement
-                    //根据手指移动距离设置进度条显示的百分比
-                    setTriggerPercentage(
-                            mAccelerateInterpolator.getInterpolation(
-                                    Math.min(Math.abs(yDiff) / tippingHeight, 1f)
-                            ));
-                    updateContentOffsetTop((int) yDiff);
-                    if (mTarget.getTop() == getPaddingTop()) {
-                        // If the user puts the view back at the top, we
-                        // don't need to. This shouldn't be considered
-                        // cancelling the gesture as the user can restart from the top.
-                        removeCallbacks(mCancel);
-                        mLastDirection = Mode.DISABLED;
+                    float dragPercent = Math.min(1f, Math.abs(originalDragPercent));
+                    float extraOS = Math.abs(overscrollTop) - mTotalDragDistance;
+                    float slingshotDist = mUsingCustomStart ? mSpinnerFinalOffset
+                            - mOriginalOffsetTop : mSpinnerFinalOffset;
+                    float tensionSlingshotPercent = Math.max(0,
+                            Math.min(extraOS, slingshotDist * 2) / slingshotDist);
+                    float tensionPercent = (float) ((tensionSlingshotPercent / 4) - Math
+                            .pow((tensionSlingshotPercent / 4), 2)) * 2f;
+                    float extraMove = (slingshotDist) * tensionPercent * 2;
+
+                    int targetY = mOriginalOffsetTop
+                            + (int) ((slingshotDist * dragPercent) + extraMove);
+                    if (mHeadViewContainer.getVisibility() != View.VISIBLE) {
+                        mHeadViewContainer.setVisibility(View.VISIBLE);
+                    }
+                    if (!mScale) {
+                        ViewCompat.setScaleX(mHeadViewContainer, 1f);
+                        ViewCompat.setScaleY(mHeadViewContainer, 1f);
+                    }
+                    if (usingDefaultHeader) {
+                        float alpha = overscrollTop / mTotalDragDistance;
+                        if (alpha >= 1.0f) {
+                            alpha = 1.0f;
+                        }
+                        ViewCompat.setScaleX(defaultProgressView, alpha);
+                        ViewCompat.setScaleY(defaultProgressView, alpha);
+                        ViewCompat.setAlpha(defaultProgressView, alpha);
+                    }
+                    if (overscrollTop < mTotalDragDistance) {
+                        if (mScale) {
+                            setAnimationProgress(overscrollTop / mTotalDragDistance);
+                        }
+                        if (mListener != null) {
+                            mListener.onPullEnable(false);
+                        }
                     } else {
-                        mDirection = (yDiff > 0 ? 1 : -1);
-                        updatePositionTimeout();
+                        if (mListener != null) {
+                            mListener.onPullEnable(true);
+                        }
                     }
-                    mLastMotionY = y;
+                    setTargetOffsetTopAndBottom(targetY - mCurrentTargetOffsetTop,
+                            true);
                 }
                 break;
-
+            }
             case MotionEventCompat.ACTION_POINTER_DOWN: {
                 final int index = MotionEventCompat.getActionIndex(ev);
-                mLastMotionY = MotionEventCompat.getY(ev, index);
                 mActivePointerId = MotionEventCompat.getPointerId(ev, index);
                 break;
             }
@@ -528,219 +772,605 @@ public class PullableLayout extends ViewGroup {
                 break;
 
             case MotionEvent.ACTION_UP:
-                final int pointerIndexx = MotionEventCompat.findPointerIndex(ev, mActivePointerId);
-                if (pointerIndexx < 0) {
-                    Log.e(TAG, "Got ACTION_MOVE event but have an invalid active pointer id.");
+            case MotionEvent.ACTION_CANCEL: {
+                if (mActivePointerId == INVALID_POINTER) {
+                    if (action == MotionEvent.ACTION_UP) {
+
+                    }
                     return false;
                 }
-
-                final float yx = MotionEventCompat.getY(ev, pointerIndexx);
-//                final float yDiff = y - mInitialMotionY;
-                final float yDiffx = (yx - mStartPoint) * DRAG_RATE;
-
-                if ((mLastDirection == Mode.PULL_DOWN && yDiffx < 0) ||
-                        (mLastDirection == Mode.PULL_UP && yDiffx > 0)) {
-                    return true;
-                }
-
-                if (!mIsBeingDragged && (yDiffx > 0 && mLastDirection == Mode.PULL_DOWN)
-                        || (yDiffx < 0 && mLastDirection == Mode.PULL_UP)) {
-                    mIsBeingDragged = true;
-                }
-                if (mIsBeingDragged) {
-                    // User velocity passed min velocity; trigger a refresh
-                    if (yDiffx > tippingHeight) {
-                        // User movement passed distance; trigger a refresh
-                        if (mLastDirection == Mode.PULL_UP) {
-                            return true;
-
-                        }
-                        if ((mMode == Mode.PULL_DOWN) || (mMode == Mode.BOTH)) {
-                            mLastDirection = Mode.PULL_DOWN;
-                            startPullDown();
-                        }
-                    } else if (-yDiffx > tippingHeight) {
-                        if ((!canChildScrollUp && !canChildScrollDown) || mLastDirection == Mode.PULL_DOWN) {
-                            return true;
-                        }
-                        if ((mMode == Mode.PULL_UP) || (mMode == Mode.BOTH)) {
-                            mLastDirection = Mode.PULL_UP;
-                            startPullUp();
-                        }
-                    } else {
-                        if (!canChildScrollUp && !canChildScrollDown && yDiffx < 0) {
-                            return true;
-                        }
-                        // Just track the user's movement
-                        //根据手指移动距离设置进度条显示的百分比
-                        setTriggerPercentage(
-                                mAccelerateInterpolator.getInterpolation(
-                                        Math.min(Math.abs(yDiffx) / tippingHeight, 1f)));
-                        updateContentOffsetTop((int) yDiffx);
-                        if (mTarget.getTop() == getPaddingTop()) {
-                            // If the user puts the view back at the top, we
-                            // don't need to. This shouldn't be considered
-                            // cancelling the gesture as the user can restart from the top.
-                            removeCallbacks(mCancel);
-                            mLastDirection = Mode.DISABLED;
-                        } else {
-                            mDirection = (yDiffx > 0 ? 1 : -1);
-                            updatePositionTimeout();
-                        }
-                    }
-                    mLastMotionY = yx;
-                }
-                break;
-            case MotionEvent.ACTION_CANCEL:
+                final int pointerIndex = MotionEventCompat.findPointerIndex(ev,
+                        mActivePointerId);
+                final float y = MotionEventCompat.getY(ev, pointerIndex);
+                final float overscrollTop = (y - mInitialMotionY) * DRAG_RATE;
                 mIsBeingDragged = false;
-                mCurrPercentage = 0;
+                if (overscrollTop > mTotalDragDistance) {
+                    setRefreshing(true, true /* notify */);
+                } else {
+                    mRefreshing = false;
+                    Animation.AnimationListener listener = null;
+                    if (!mScale) {
+                        listener = new Animation.AnimationListener() {
+
+                            @Override
+                            public void onAnimationStart(Animation animation) {
+                            }
+
+                            @Override
+                            public void onAnimationEnd(Animation animation) {
+                                if (!mScale) {
+                                    startScaleDownAnimation(null);
+                                }
+                            }
+
+                            @Override
+                            public void onAnimationRepeat(Animation animation) {
+                            }
+
+                        };
+                    }
+                    animateOffsetToStartPosition(mCurrentTargetOffsetTop, listener);
+                }
                 mActivePointerId = INVALID_POINTER;
-                mLastDirection = Mode.DISABLED;
                 return false;
+            }
         }
 
         return true;
     }
 
-    public void setOnPullListener(OnPullListener listener) {
-        this.mPullListener = listener;
+    /**
+     * 处理上拉加载更多的Touch事件
+     *
+     * @param ev
+     * @param action
+     * @return
+     */
+    private boolean handlerPushTouchEvent(MotionEvent ev, int action) {
+        switch (action) {
+            case MotionEvent.ACTION_DOWN:
+                mActivePointerId = MotionEventCompat.getPointerId(ev, 0);
+                mIsBeingDragged = false;
+                break;
+            case MotionEvent.ACTION_MOVE: {
+                final int pointerIndex = MotionEventCompat.findPointerIndex(ev,
+                        mActivePointerId);
+                if (pointerIndex < 0) {
+                    return false;
+                }
+                final float y = MotionEventCompat.getY(ev, pointerIndex);
+                final float overscrollBottom = (mInitialMotionY - y) * DRAG_RATE;
+                if (mIsBeingDragged) {
+                    pushDistance = (int) overscrollBottom;
+                    updateFooterViewPosition();
+                    if (mPullLoadMoreListener != null) {
+                        mPullLoadMoreListener
+                                .onPushEnable(pushDistance >= mFooterViewHeight);
+                    }
+                }
+                break;
+            }
+            case MotionEventCompat.ACTION_POINTER_DOWN: {
+                final int index = MotionEventCompat.getActionIndex(ev);
+                mActivePointerId = MotionEventCompat.getPointerId(ev, index);
+                break;
+            }
+
+            case MotionEventCompat.ACTION_POINTER_UP:
+                onSecondaryPointerUp(ev);
+                break;
+
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL: {
+                if (mActivePointerId == INVALID_POINTER) {
+                    if (action == MotionEvent.ACTION_UP) {
+                    }
+                    return false;
+                }
+                final int pointerIndex = MotionEventCompat.findPointerIndex(ev,
+                        mActivePointerId);
+                final float y = MotionEventCompat.getY(ev, pointerIndex);
+                final float overscrollBottom = (mInitialMotionY - y) * DRAG_RATE;// 松手是下拉的距离
+                mIsBeingDragged = false;
+                mActivePointerId = INVALID_POINTER;
+                if (overscrollBottom < mFooterViewHeight
+                        || mPullLoadMoreListener == null) {// 直接取消
+                    pushDistance = 0;
+                } else {// 下拉到mFooterViewHeight
+                    pushDistance = mFooterViewHeight;
+                }
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.HONEYCOMB) {
+                    updateFooterViewPosition();
+                    if (pushDistance == mFooterViewHeight
+                            && mPullLoadMoreListener != null) {
+                        mLoadMore = true;
+                        mPullLoadMoreListener.onLoadMore();
+                    }
+                } else {
+                    animatorFooterToBottom((int) overscrollBottom, pushDistance);
+                }
+                return false;
+            }
+        }
+        return true;
     }
 
-    private void startPullDown() {
-        if (!mPullingUp && !mPullingDown) {
-            removeCallbacks(mCancel);
-            mReturnToStartPosition.run();
-            setPullingDown(true);
-            if (mPullListener != null) {
-                mPullListener.onPullDown();
+    /**
+     * 松手之后，使用动画将Footer从距离start变化到end
+     *
+     * @param start
+     * @param end
+     */
+    @TargetApi(Build.VERSION_CODES.HONEYCOMB)
+    private void animatorFooterToBottom(int start, final int end) {
+        ValueAnimator valueAnimator = ValueAnimator.ofInt(start, end);
+        valueAnimator.setDuration(150);
+        valueAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+
+            @Override
+            public void onAnimationUpdate(ValueAnimator valueAnimator) {
+                // update
+                pushDistance = (Integer) valueAnimator.getAnimatedValue();
+                updateFooterViewPosition();
+            }
+        });
+        valueAnimator.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                if (end > 0 && mPullLoadMoreListener != null) {
+                    // start loading more
+                    mLoadMore = true;
+                    mPullLoadMoreListener.onLoadMore();
+                } else {
+                    resetTargetLayout();
+                    mLoadMore = false;
+                }
+            }
+        });
+        valueAnimator.setInterpolator(mDecelerateInterpolator);
+        valueAnimator.start();
+    }
+
+    /**
+     * 设置停止加载
+     *
+     * @param loadMore
+     */
+    public void setLoadMore(boolean loadMore) {
+        if (!loadMore && mLoadMore) {// 停止加载
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.HONEYCOMB) {
+                mLoadMore = false;
+                pushDistance = 0;
+                updateFooterViewPosition();
+            } else {
+                animatorFooterToBottom(mFooterViewHeight, 0);
             }
         }
     }
 
-    private void startPullUp() {
-        if (!mPullingUp && !mPullingDown) {
-            removeCallbacks(mCancel);
-            mReturnToStartPosition.run();
-            setPullingUp(true);
-            if (mPullListener != null) {
-                mPullListener.onPullUp();
-            }
+    private void animateOffsetToCorrectPosition(int from,
+                                                Animation.AnimationListener listener) {
+        mFrom = from;
+        mAnimateToCorrectPosition.reset();
+        mAnimateToCorrectPosition.setDuration(ANIMATE_TO_TRIGGER_DURATION);
+        mAnimateToCorrectPosition.setInterpolator(mDecelerateInterpolator);
+        if (listener != null) {
+            mHeadViewContainer.setAnimationListener(listener);
         }
+        mHeadViewContainer.clearAnimation();
+        mHeadViewContainer.startAnimation(mAnimateToCorrectPosition);
     }
 
-    //手指移动时更新子控件的位置
-    private void updateContentOffsetTop(int targetTop) {
-        final int currentTop = mTarget.getTop();
-        setTargetOffsetTopAndBottom(targetTop - currentTop);
+    private void animateOffsetToStartPosition(int from,
+                                              Animation.AnimationListener listener) {
+        if (mScale) {
+            startScaleDownReturnToStartAnimation(from, listener);
+        } else {
+            mFrom = from;
+            mAnimateToStartPosition.reset();
+            mAnimateToStartPosition.setDuration(ANIMATE_TO_START_DURATION);
+            mAnimateToStartPosition.setInterpolator(mDecelerateInterpolator);
+            if (listener != null) {
+                mHeadViewContainer.setAnimationListener(listener);
+            }
+            mHeadViewContainer.clearAnimation();
+            mHeadViewContainer.startAnimation(mAnimateToStartPosition);
+        }
+        resetTargetLayoutDelay(ANIMATE_TO_START_DURATION);
     }
 
-    //根据偏移量对子控件进行移动
-    private void setTargetOffsetTopAndBottom(int offset) {
-        mTarget.offsetTopAndBottom(offset);
-        mCurrentTargetOffsetTop = mTarget.getTop();
+    /**
+     * 重置Target位置
+     *
+     * @param delay
+     */
+    public void resetTargetLayoutDelay(int delay) {
+        new Handler().postDelayed(new Runnable() {
+
+            @Override
+            public void run() {
+                resetTargetLayout();
+            }
+        }, delay);
     }
 
-    private void updatePositionTimeout() {
-        removeCallbacks(mCancel);
-        postDelayed(mCancel, RETURN_TO_ORIGINAL_POSITION_TIMEOUT);
+    /**
+     * 重置Target的位置
+     */
+    public void resetTargetLayout() {
+        final int width = getMeasuredWidth();
+        final int height = getMeasuredHeight();
+        final View child = mTarget;
+        final int childLeft = getPaddingLeft();
+        final int childTop = getPaddingTop();
+        final int childWidth = child.getWidth() - getPaddingLeft()
+                - getPaddingRight();
+        final int childHeight = child.getHeight() - getPaddingTop()
+                - getPaddingBottom();
+        child.layout(childLeft, childTop, childLeft + childWidth, childTop
+                + childHeight);
+
+        int headViewWidth = mHeadViewContainer.getMeasuredWidth();
+        int headViewHeight = mHeadViewContainer.getMeasuredHeight();
+        mHeadViewContainer.layout((width / 2 - headViewWidth / 2),
+                -headViewHeight, (width / 2 + headViewWidth / 2), 0);// 更新头布局的位置
+        int footViewWidth = mFooterViewContainer.getMeasuredWidth();
+        int footViewHeight = mFooterViewContainer.getMeasuredHeight();
+        mFooterViewContainer.layout((width / 2 - footViewWidth / 2), height,
+                (width / 2 + footViewWidth / 2), height + footViewHeight);
+    }
+
+    private final Animation mAnimateToCorrectPosition = new Animation() {
+        @Override
+        public void applyTransformation(float interpolatedTime, Transformation t) {
+            int targetTop = 0;
+            int endTarget = 0;
+            if (!mUsingCustomStart) {
+                endTarget = (int) (mSpinnerFinalOffset - Math
+                        .abs(mOriginalOffsetTop));
+            } else {
+                endTarget = (int) mSpinnerFinalOffset;
+            }
+            targetTop = (mFrom + (int) ((endTarget - mFrom) * interpolatedTime));
+            int offset = targetTop - mHeadViewContainer.getTop();
+            setTargetOffsetTopAndBottom(offset, false /* requires update */);
+        }
+
+        @Override
+        public void setAnimationListener(AnimationListener listener) {
+            super.setAnimationListener(listener);
+        }
+    };
+
+    private void moveToStart(float interpolatedTime) {
+        int targetTop = 0;
+        targetTop = (mFrom + (int) ((mOriginalOffsetTop - mFrom) * interpolatedTime));
+        int offset = targetTop - mHeadViewContainer.getTop();
+        setTargetOffsetTopAndBottom(offset, false /* requires update */);
+    }
+
+    private final Animation mAnimateToStartPosition = new Animation() {
+        @Override
+        public void applyTransformation(float interpolatedTime, Transformation t) {
+            moveToStart(interpolatedTime);
+        }
+    };
+
+    private void startScaleDownReturnToStartAnimation(int from,
+                                                      Animation.AnimationListener listener) {
+        mFrom = from;
+        mStartingScale = ViewCompat.getScaleX(mHeadViewContainer);
+        mScaleDownToStartAnimation = new Animation() {
+            @Override
+            public void applyTransformation(float interpolatedTime,
+                                            Transformation t) {
+                float targetScale = (mStartingScale + (-mStartingScale * interpolatedTime));
+                setAnimationProgress(targetScale);
+                moveToStart(interpolatedTime);
+            }
+        };
+        mScaleDownToStartAnimation.setDuration(SCALE_DOWN_DURATION);
+        if (listener != null) {
+            mHeadViewContainer.setAnimationListener(listener);
+        }
+        mHeadViewContainer.clearAnimation();
+        mHeadViewContainer.startAnimation(mScaleDownToStartAnimation);
+    }
+
+    private void setTargetOffsetTopAndBottom(int offset, boolean requiresUpdate) {
+        mHeadViewContainer.bringToFront();
+        mHeadViewContainer.offsetTopAndBottom(offset);
+        mCurrentTargetOffsetTop = mHeadViewContainer.getTop();
+        if (requiresUpdate && Build.VERSION.SDK_INT < 11) {
+            invalidate();
+        }
+        updateListenerCallBack();
+    }
+
+    /**
+     * 修改底部布局的位置-敏感pushDistance
+     */
+    private void updateFooterViewPosition() {
+        mFooterViewContainer.setVisibility(View.VISIBLE);
+        mFooterViewContainer.bringToFront();
+        //针对4.4及之前版本的兼容
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) {
+            mFooterViewContainer.getParent().requestLayout();
+        }
+        mFooterViewContainer.offsetTopAndBottom(-pushDistance);
+        updatePushDistanceListener();
+    }
+
+    private void updatePushDistanceListener() {
+        if (mPullLoadMoreListener != null) {
+            mPullLoadMoreListener.onPushDistance(pushDistance);
+        }
     }
 
     private void onSecondaryPointerUp(MotionEvent ev) {
         final int pointerIndex = MotionEventCompat.getActionIndex(ev);
         final int pointerId = MotionEventCompat.getPointerId(ev, pointerIndex);
         if (pointerId == mActivePointerId) {
-            // This was our active pointer going u.p. Choose a new
-            // active pointer and adjust accordingly.
             final int newPointerIndex = pointerIndex == 0 ? 1 : 0;
-            mLastMotionY = MotionEventCompat.getY(ev, newPointerIndex);
-            mActivePointerId = MotionEventCompat.getPointerId(ev, newPointerIndex);
+            mActivePointerId = MotionEventCompat.getPointerId(ev,
+                    newPointerIndex);
         }
-    }
-
-    public interface OnPullListener {
-        void onPullDown();
-
-        void onPullUp();
-    }
-
-    public void setMode(Mode mode) {
-        this.mMode = mode;
-    }
-
-    public static enum Mode {
-        /**
-         * Disable all Pull-to-Refresh gesture and Refreshing handling
-         */
-        DISABLED(0x0),
-
-        /**
-         * Only allow the user to Pull from the start of the Refreshable View to
-         * refresh. The start is either the Top or Left, depending on the
-         * scrolling direction.
-         */
-        PULL_DOWN(0x1),
-
-        /**
-         * Only allow the user to Pull from the end of the Refreshable View to
-         * refresh. The start is either the Bottom or Right, depending on the
-         * scrolling direction.
-         */
-        PULL_UP(0x2),
-
-        /**
-         * Allow the user to both Pull from the start, from the end to refresh.
-         */
-        BOTH(0x3);
-
-        static Mode getDefault() {
-            return BOTH;
-        }
-
-        boolean permitsPullToRefresh() {
-            return !(this == DISABLED);
-        }
-
-        boolean permitsPullFromStart() {
-            return (this == Mode.BOTH || this == Mode.PULL_DOWN);
-        }
-
-        boolean permitsPullFromEnd() {
-            return (this == Mode.BOTH || this == Mode.PULL_UP);
-        }
-
-        private int mIntValue;
-
-        // The modeInt values need to match those from attrs.xml
-        Mode(int modeInt) {
-            mIntValue = modeInt;
-        }
-
-        int getIntValue() {
-            return mIntValue;
-        }
-
     }
 
     /**
-     * Simple AnimationListener to avoid having to implement unneeded methods in
-     * AnimationListeners.
+     * @Description 下拉刷新布局头部的容器
      */
-    private class BaseAnimationListener implements AnimationListener {
-        @Override
-        public void onAnimationStart(Animation animation) {
+    private class HeadViewContainer extends RelativeLayout {
+
+        private Animation.AnimationListener mListener;
+
+        public HeadViewContainer(Context context) {
+            super(context);
+        }
+
+        public void setAnimationListener(Animation.AnimationListener listener) {
+            mListener = listener;
         }
 
         @Override
-        public void onAnimationEnd(Animation animation) {
+        public void onAnimationStart() {
+            super.onAnimationStart();
+            if (mListener != null) {
+                mListener.onAnimationStart(getAnimation());
+            }
         }
 
         @Override
-        public void onAnimationRepeat(Animation animation) {
+        public void onAnimationEnd() {
+            super.onAnimationEnd();
+            if (mListener != null) {
+                mListener.onAnimationEnd(getAnimation());
+            }
         }
     }
 
-    public static DisplayMetrics getDisplayMetrics(Context context) {
-        DisplayMetrics metrics = context.getResources().getDisplayMetrics();
-        return metrics;
+    /**
+     * 判断子View是否跟随手指的滑动而滑动，默认跟随
+     *
+     * @return
+     */
+    public boolean isTargetScrollWithLayout() {
+        return targetScrollWithLayout;
+    }
+
+    /**
+     * 设置子View是否跟谁手指的滑动而滑动
+     *
+     * @param targetScrollWithLayout
+     */
+    public void setTargetScrollWithLayout(boolean targetScrollWithLayout) {
+        this.targetScrollWithLayout = targetScrollWithLayout;
+    }
+
+    /**
+     * 下拉刷新回调
+     */
+    public interface OnPullRefreshListener {
+        void onRefresh();
+        void onPullDistance(int distance);
+        void onPullEnable(boolean enable);
+    }
+
+    /**
+     * 上拉加载更多
+     */
+    public interface OnPullLoadMoreListener {
+        void onLoadMore();
+        void onPushDistance(int distance);
+        void onPushEnable(boolean enable);
+    }
+
+    /**
+     * 设置默认下拉刷新进度条的颜色
+     *
+     * @param color
+     */
+    public void setDefaultCircleProgressColor(int color) {
+        if (usingDefaultHeader) {
+            defaultProgressView.setProgressColor(color);
+        }
+    }
+
+    /**
+     * 设置圆圈的背景色
+     *
+     * @param color
+     */
+    public void setDefaultCircleBackgroundColor(int color) {
+        if (usingDefaultHeader) {
+            defaultProgressView.setCircleBackgroundColor(color);
+        }
+    }
+
+    public void setDefaultCircleShadowColor(int color) {
+        if (usingDefaultHeader) {
+            defaultProgressView.setShadowColor(color);
+        }
+    }
+
+    /**
+     * 默认的下拉刷新样式
+     */
+    public class CircleProgressView extends View implements Runnable {
+
+        private static final int PEROID = 16;// 绘制周期
+        private Paint progressPaint;
+        private Paint bgPaint;
+        private int width;// view的高度
+        private int height;// view的宽度
+
+        private boolean isOnDraw = false;
+        private boolean isRunning = false;
+        private int startAngle = 0;
+        private int speed = 8;
+        private RectF ovalRect = null;
+        private RectF bgRect = null;
+        private int swipeAngle;
+        private int progressColor = 0xffcccccc;
+        private int circleBackgroundColor = 0xffffffff;
+        private int shadowColor = 0xff999999;
+
+        public CircleProgressView(Context context) {
+            super(context);
+        }
+
+        public CircleProgressView(Context context, AttributeSet attrs) {
+            super(context, attrs);
+        }
+
+        public CircleProgressView(Context context, AttributeSet attrs,
+                                  int defStyleAttr) {
+            super(context, attrs, defStyleAttr);
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            canvas.drawArc(getBgRect(), 0, 360, false, createBgPaint());
+            int index = startAngle / 360;
+            if (index % 2 == 0) {
+                swipeAngle = (startAngle % 720) / 2;
+            } else {
+                swipeAngle = 360 - (startAngle % 720) / 2;
+            }
+            canvas.drawArc(getOvalRect(), startAngle, swipeAngle, false,
+                    createPaint());
+        }
+
+        private RectF getBgRect() {
+            width = getWidth();
+            height = getHeight();
+            if (bgRect == null) {
+                int offset = (int) (density * 2);
+                bgRect = new RectF(offset, offset, width - offset, height
+                        - offset);
+            }
+            return bgRect;
+        }
+
+        private RectF getOvalRect() {
+            width = getWidth();
+            height = getHeight();
+            if (ovalRect == null) {
+                int offset = (int) (density * 8);
+                ovalRect = new RectF(offset, offset, width - offset, height
+                        - offset);
+            }
+            return ovalRect;
+        }
+
+        public void setProgressColor(int progressColor) {
+            this.progressColor = progressColor;
+        }
+
+        public void setCircleBackgroundColor(int circleBackgroundColor) {
+            this.circleBackgroundColor = circleBackgroundColor;
+        }
+
+        public void setShadowColor(int shadowColor) {
+            this.shadowColor = shadowColor;
+        }
+
+        /**
+         * 根据画笔的颜色，创建画笔
+         *
+         * @return
+         */
+        private Paint createPaint() {
+            if (this.progressPaint == null) {
+                progressPaint = new Paint();
+                progressPaint.setStrokeWidth((int) (density * 3));
+                progressPaint.setStyle(Paint.Style.STROKE);
+                progressPaint.setAntiAlias(true);
+            }
+            progressPaint.setColor(progressColor);
+            return progressPaint;
+        }
+
+        private Paint createBgPaint() {
+            if (this.bgPaint == null) {
+                bgPaint = new Paint();
+                bgPaint.setColor(circleBackgroundColor);
+                bgPaint.setStyle(Paint.Style.FILL);
+                bgPaint.setAntiAlias(true);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
+                    this.setLayerType(LAYER_TYPE_SOFTWARE, bgPaint);
+                }
+                bgPaint.setShadowLayer(4.0f, 0.0f, 2.0f, shadowColor);
+            }
+            return bgPaint;
+        }
+
+        public void setPullDistance(int distance) {
+            this.startAngle = distance * 2;
+            postInvalidate();
+        }
+
+        @Override
+        public void run() {
+            while (isOnDraw) {
+                isRunning = true;
+                long startTime = System.currentTimeMillis();
+                startAngle += speed;
+                postInvalidate();
+                long time = System.currentTimeMillis() - startTime;
+                if (time < PEROID) {
+                    try {
+                        Thread.sleep(PEROID - time);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
+
+        public void setOnDraw(boolean isOnDraw) {
+            this.isOnDraw = isOnDraw;
+        }
+
+        public void setSpeed(int speed) {
+            this.speed = speed;
+        }
+
+        public boolean isRunning() {
+            return isRunning;
+        }
+
+        @Override
+        public void onWindowFocusChanged(boolean hasWindowFocus) {
+            super.onWindowFocusChanged(hasWindowFocus);
+        }
+
+        @Override
+        protected void onDetachedFromWindow() {
+            isOnDraw = false;
+            super.onDetachedFromWindow();
+        }
+
     }
 }

@@ -1,30 +1,37 @@
 package com.osshare.andos;
 
+import android.database.DataSetObserver;
 import android.os.Bundle;
-import android.os.Handler;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Adapter;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.ViewFlipper;
 
-import com.osshare.core.view.pull.BasePullLayout;
-import com.osshare.core.view.pull.MaterialPullLayout;
-import com.osshare.core.view.pull.PullXLayout;
+import com.osshare.andos.base.abs.AbsActivity;
+import com.osshare.core.view.pull.temp.MaterialPullLayout;
 import com.osshare.framework.base.BaseActivity;
 import com.osshare.framework.base.BaseAdapter;
 import com.osshare.framework.base.BaseViewHolder;
 
+import org.taptwo.android.widget.ViewFlow;
+
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletionService;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 
 /**
  * Created by apple on 16/12/6.
  */
-public class TestActivity extends BaseActivity {
+public class TestActivity extends AbsActivity {
 //    private PullXLayout pvContainer;
     private MaterialPullLayout pvContainer;
 
@@ -43,6 +50,8 @@ public class TestActivity extends BaseActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_test);
+        immersiveHeaderContainer(R.id.layout_title_bar);
+
         ((TextView) findViewById(R.id.tv_title)).setText("测试");
 
         List<String> data = new ArrayList<>();
@@ -53,6 +62,7 @@ public class TestActivity extends BaseActivity {
 
 
         pvContainer= (MaterialPullLayout) findViewById(R.id.pl_container);
+        pvContainer.setVisibility(View.GONE);
 
         rvContent = (RecyclerView) findViewById(R.id.rv_content);
         rvContent.setLayoutManager(new LinearLayoutManager(TestActivity.this));
@@ -70,6 +80,10 @@ public class TestActivity extends BaseActivity {
             }
         };
         rvContent.setAdapter(adapter);
+    }
+
+    public void banner(){
+
     }
 
 

@@ -1,4 +1,4 @@
-package com.osshare.core.view.pull;
+package com.osshare.core.view.pull.temp;
 
 import android.content.Context;
 import android.support.v4.view.ViewCompat;

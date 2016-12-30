@@ -1,4 +1,4 @@
-package com.osshare.core.view.pull;
+package com.osshare.core.view.pull.temp;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -33,10 +33,9 @@ import android.widget.RelativeLayout;
 import android.widget.ScrollView;
 
 /**
- * Created by apple on 16/12/15.
+ * Created by apple on 16/12/16.
  */
-public class PullXLayout extends ViewGroup {
-
+public class BasePullLayout extends ViewGroup {
     private static final int HEADER_VIEW_HEIGHT = 50;
 
     private static final float DECELERATE_INTERPOLATION_FACTOR = 2f;
@@ -50,8 +49,7 @@ public class PullXLayout extends ViewGroup {
 
     private View mTarget;
 
-    private OnPullRefreshListener mListener;// 下拉刷新listener
-    private OnPushLoadMoreListener mOnPushLoadMoreListener;// 上拉加载更多
+    private OnPullListener mPullListener;
 
     private boolean mRefreshing = false;
     private boolean mLoadMore = false;
@@ -137,8 +135,8 @@ public class PullXLayout extends ViewGroup {
                         defaultProgressView.setOnDraw(true);
                         new Thread(defaultProgressView).start();
                     }
-                    if (mListener != null) {
-                        mListener.onRefresh();
+                    if (mPullListener != null) {
+                        mPullListener.onPullDown();
                     }
                 }
             } else {
@@ -160,8 +158,8 @@ public class PullXLayout extends ViewGroup {
      */
     private void updateListenerCallBack() {
         int distance = mCurrentTargetOffsetTop + mHeadViewContainer.getHeight();
-        if (mListener != null) {
-            mListener.onPullDistance(distance);
+        if (mPullListener != null) {
+            mPullListener.onPullDownDistance(distance);
         }
         if (usingDefaultHeader && isProgressEnable) {
             defaultProgressView.setPullDistance(distance);
@@ -201,12 +199,12 @@ public class PullXLayout extends ViewGroup {
         mFooterViewContainer.addView(child, layoutParams);
     }
 
-    public PullXLayout(Context context) {
+    public BasePullLayout(Context context) {
         this(context, null);
     }
 
     @SuppressWarnings("deprecation")
-    public PullXLayout(Context context, AttributeSet attrs) {
+    public BasePullLayout(Context context, AttributeSet attrs) {
         super(context, attrs);
 
         /**
@@ -301,27 +299,12 @@ public class PullXLayout extends ViewGroup {
         addView(mFooterViewContainer);
     }
 
-    /**
-     * 设置
-     *
-     * @param listener
-     */
-    public void setOnPullRefreshListener(OnPullRefreshListener listener) {
-        mListener = listener;
+    public void setOnPullListener(OnPullListener listener){
+        this.mPullListener=listener;
     }
 
     public void setHeaderViewBackgroundColor(int color) {
         mHeadViewContainer.setBackgroundColor(color);
-    }
-
-    /**
-     * 设置上拉加载更多的接口
-     *
-     * @param onPushLoadMoreListener
-     */
-    public void setOnPushLoadMoreListener(
-            OnPushLoadMoreListener onPushLoadMoreListener) {
-        this.mOnPushLoadMoreListener = onPushLoadMoreListener;
     }
 
     /**
@@ -761,12 +744,12 @@ public class PullXLayout extends ViewGroup {
                         if (mScale) {
                             setAnimationProgress(overscrollTop / mTotalDragDistance);
                         }
-                        if (mListener != null) {
-                            mListener.onPullEnable(false);
+                        if (mPullListener != null) {
+                            mPullListener.onPullDownEnable(false);
                         }
                     } else {
-                        if (mListener != null) {
-                            mListener.onPullEnable(true);
+                        if (mPullListener != null) {
+                            mPullListener.onPullDownEnable(true);
                         }
                     }
                     setTargetOffsetTopAndBottom(targetY - mCurrentTargetOffsetTop,
@@ -856,9 +839,8 @@ public class PullXLayout extends ViewGroup {
                 if (mIsBeingDragged) {
                     pushDistance = (int) overscrollBottom;
                     updateFooterViewPosition();
-                    if (mOnPushLoadMoreListener != null) {
-                        mOnPushLoadMoreListener
-                                .onPushEnable(pushDistance >= mFooterViewHeight);
+                    if (mPullListener != null) {
+                        mPullListener.onPullUpEnable(pushDistance >= mFooterViewHeight);
                     }
                 }
                 break;
@@ -887,7 +869,7 @@ public class PullXLayout extends ViewGroup {
                 mIsBeingDragged = false;
                 mActivePointerId = INVALID_POINTER;
                 if (overscrollBottom < mFooterViewHeight
-                        || mOnPushLoadMoreListener == null) {// 直接取消
+                        || mPullListener == null) {// 直接取消
                     pushDistance = 0;
                 } else {// 下拉到mFooterViewHeight
                     pushDistance = mFooterViewHeight;
@@ -895,9 +877,9 @@ public class PullXLayout extends ViewGroup {
                 if (Build.VERSION.SDK_INT < Build.VERSION_CODES.HONEYCOMB) {
                     updateFooterViewPosition();
                     if (pushDistance == mFooterViewHeight
-                            && mOnPushLoadMoreListener != null) {
+                            && mPullListener != null) {
                         mLoadMore = true;
-                        mOnPushLoadMoreListener.onLoadMore();
+                        mPullListener.onPullUp();
                     }
                 } else {
                     animatorFooterToBottom((int) overscrollBottom, pushDistance);
@@ -930,10 +912,10 @@ public class PullXLayout extends ViewGroup {
         valueAnimator.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(Animator animation) {
-                if (end > 0 && mOnPushLoadMoreListener != null) {
+                if (end > 0 && mPullListener != null) {
                     // start loading more
                     mLoadMore = true;
-                    mOnPushLoadMoreListener.onLoadMore();
+                    mPullListener.onPullUp();
                 } else {
                     resetTargetLayout();
                     mLoadMore = false;
@@ -1115,8 +1097,8 @@ public class PullXLayout extends ViewGroup {
     }
 
     private void updatePushDistanceListener() {
-        if (mOnPushLoadMoreListener != null) {
-            mOnPushLoadMoreListener.onPushDistance(pushDistance);
+        if (mPullListener != null) {
+            mPullListener.onPullUpDistance(pushDistance);
         }
     }
 
@@ -1180,71 +1162,18 @@ public class PullXLayout extends ViewGroup {
         this.targetScrollWithLayout = targetScrollWithLayout;
     }
 
-    /**
-     * 下拉刷新回调
-     */
-    public interface OnPullRefreshListener {
-        public void onRefresh();
 
-        public void onPullDistance(int distance);
 
-        public void onPullEnable(boolean enable);
+    public interface OnPullListener{
+        void onPullDown();
+        void onPullDownDistance(int distance);
+        void onPullDownEnable(boolean enable);
+
+        void onPullUp();
+        void onPullUpDistance(int distance);
+        void onPullUpEnable(boolean enable);
     }
 
-    /**
-     * 上拉加载更多
-     */
-    public interface OnPushLoadMoreListener {
-        public void onLoadMore();
-
-        public void onPushDistance(int distance);
-
-        public void onPushEnable(boolean enable);
-    }
-
-
-
-    /**
-     * Adapter
-     */
-    public class OnPullRefreshListenerAdapter implements OnPullRefreshListener {
-
-        @Override
-        public void onRefresh() {
-
-        }
-
-        @Override
-        public void onPullDistance(int distance) {
-
-        }
-
-        @Override
-        public void onPullEnable(boolean enable) {
-
-        }
-
-    }
-
-    public class OnPushLoadMoreListenerAdapter implements
-            OnPushLoadMoreListener {
-
-        @Override
-        public void onLoadMore() {
-
-        }
-
-        @Override
-        public void onPushDistance(int distance) {
-
-        }
-
-        @Override
-        public void onPushEnable(boolean enable) {
-
-        }
-
-    }
 
     /**
      * 设置默认下拉刷新进度条的颜色

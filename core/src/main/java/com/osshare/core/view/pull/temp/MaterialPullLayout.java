@@ -1,4 +1,4 @@
-package com.osshare.core.view.pull;
+package com.osshare.core.view.pull.temp;
 
 import android.content.Context;
 import android.graphics.Color;
@@ -11,6 +11,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
+import android.widget.AbsListView;
 import android.widget.ImageView;
 
 /**
@@ -33,10 +34,10 @@ public class MaterialPullLayout extends ViewGroup {
 
     private int mTouchSlop;
     private int mActivePointerId = INVALID_POINTER;
-    private int HEADER_WIDTH = 150;
-    private int HEADER_HEIGHT = 150;
-    private int FOOTER_WIDTH = 150;
-    private int FOOTER_HEIGHT = 150;
+    private int HEADER_WIDTH = 80;
+    private int HEADER_HEIGHT = 80;
+    private int FOOTER_WIDTH = 80;
+    private int FOOTER_HEIGHT = 80;
 
     //计算开始时便宜量的标志位
     private boolean mOriginalOffsetCalculated = false;
@@ -74,12 +75,12 @@ public class MaterialPullLayout extends ViewGroup {
         mTopView = new ImageView(getContext());
         mTopView.setBackgroundColor(Color.RED);
         mTopView.setVisibility(GONE);
-        addView(mTopView);
+        addView(mTopView,0);
 
         mBottomView = new ImageView(getContext());
         mBottomView.setBackgroundColor(Color.GREEN);
         mBottomView.setVisibility(GONE);
-        addView(mBottomView);
+        addView(mBottomView,getChildCount());
     }
 
     @Override
@@ -147,7 +148,7 @@ public class MaterialPullLayout extends ViewGroup {
 //        Log.i(TAG, "onLayout-->circleWidth-->" + circleWidth);
 //        Log.i(TAG, "onLayout-->circleHeight-->" + circleHeight);
 
-        Log.i(TAG, "onLayout-->mCurrentTargetOffsetTop-->" + mCurrentTargetOffsetTop);
+//        Log.i(TAG, "onLayout-->mCurrentTargetOffsetTop-->" + mCurrentTargetOffsetTop);
         mTopView.layout((width / 2 - topViewWidth / 2), mCurrentTargetOffsetTop - topViewHeight,
                 (width / 2 + topViewWidth / 2), mCurrentTargetOffsetTop);
         int footViewWidth = mBottomView.getMeasuredWidth();
@@ -173,34 +174,26 @@ public class MaterialPullLayout extends ViewGroup {
 
 
     private float mInitialDownY;
-    private float mLastMotionY;
 
     @Override
     public boolean onInterceptTouchEvent(MotionEvent ev) {
         final int action = MotionEventCompat.getActionMasked(ev);
+        Log.i(TAG, "canTargetScrollDown()-->" + canTargetScrollDown());
         switch (action) {
             case MotionEvent.ACTION_DOWN:
                 mPullState = STATE_PULL_ORIGINAL;
                 mActivePointerId = MotionEventCompat.getPointerId(ev, 0);
                 final float initialDownY = getMotionEventY(ev, mActivePointerId);
-                mInitialDownY = mLastMotionY = initialDownY;
+                mInitialDownY = initialDownY;
                 break;
             case MotionEvent.ACTION_MOVE:
                 float yCurr = MotionEventCompat.getY(ev, mActivePointerId);
                 float yDiff = yCurr - mInitialDownY;
-                Log.i(TAG, "yDiff" + yDiff + "mTarget.getTop()" + mTarget.getTop());
+//                Log.i(TAG, "yDiff" + yDiff + "mTarget.getTop()" + mTarget.getTop());
                 if (!canTargetScrollDown() && yDiff > 0) {
                     mPullState = STATE_PULLING_DOWN;
-                    if (yDiff > HEADER_HEIGHT) {
-                        mPullState = STATE_PULL_DOWN_TIPPING;
-                    }
                 } else if (!canTargetScrollUp() && yDiff < 0) {
                     mPullState = STATE_PULLING_UP;
-                    if (-yDiff > FOOTER_HEIGHT) {
-                        mPullState = STATE_PULL_UP_TIPPING;
-                    }
-                } else {
-                    mPullState = STATE_PULL_ORIGINAL;
                 }
                 break;
             case MotionEvent.ACTION_CANCEL:
@@ -216,39 +209,50 @@ public class MaterialPullLayout extends ViewGroup {
                 }
                 break;
         }
-        return mPullState == STATE_PULLING_DOWN
-                || mPullState == STATE_PULLING_UP
-                || mPullState == STATE_PULL_DOWN_TIPPING
-                || mPullState == STATE_PULL_UP_TIPPING;
+        return mPullState == STATE_PULLING_DOWN || mPullState == STATE_PULLING_UP;
     }
 
     @Override
     public boolean onTouchEvent(MotionEvent ev) {
         final int action = MotionEventCompat.getActionMasked(ev);
+        int pointerIndex = -1;
         switch (action) {
             case MotionEvent.ACTION_DOWN:
+                mActivePointerId = MotionEventCompat.getPointerId(ev, 0);
                 break;
             case MotionEvent.ACTION_MOVE:
-                mActivePointerId = MotionEventCompat.getPointerId(ev, 0);
-                float yCurr = MotionEventCompat.getY(ev, mActivePointerId);
-                float yDiff = (yCurr - mLastMotionY) * DRAG_RATE;
-                mLastMotionY = yCurr;
+                pointerIndex = MotionEventCompat.findPointerIndex(ev, mActivePointerId);
+                if (pointerIndex < 0) {
+                    return false;
+                }
+                float yCurr = MotionEventCompat.getY(ev, pointerIndex);
+                float overScroll = (yCurr - mInitialDownY) * DRAG_RATE;
+                if (mPullState == STATE_PULLING_DOWN && overScroll > HEADER_HEIGHT) {
+                    mPullState = STATE_PULL_DOWN_TIPPING;
+                } else if (mPullState == STATE_PULL_DOWN_TIPPING && overScroll < HEADER_HEIGHT) {
+                    mPullState = STATE_PULLING_DOWN;
+                } else if (mPullState == STATE_PULLING_UP && -overScroll > FOOTER_HEIGHT) {
+                    mPullState = STATE_PULL_UP_TIPPING;
+                } else if (mPullState == STATE_PULL_UP_TIPPING && -overScroll < FOOTER_HEIGHT) {
+                    mPullState = STATE_PULLING_UP;
+                }
+
+                Log.i(TAG, "canTargetScrollDown()-->" + canTargetScrollDown() + "canTargetScrollUp()-->" + canTargetScrollUp() + "mPullState-->" + mPullState);
                 if (mPullState == STATE_PULLING_DOWN
                         || mPullState == STATE_PULLING_UP
                         || mPullState == STATE_PULL_DOWN_TIPPING
                         || mPullState == STATE_PULL_UP_TIPPING) {
-//                    Log.i(TAG, "yDiff-->" + yDiff + "mTarget.getTop()-->" + mTarget.getTop());
-                    setTargetOffsetTopAndBottom((int) yDiff, true);
+                    setTargetOffsetTopAndBottom((int) overScroll, true);
                 }
                 break;
             case MotionEvent.ACTION_UP:
-                setTargetOffsetTopAndBottom(-mCurrentTargetOffsetTop, true);
+                setTargetOffsetTopAndBottom(0, true);
                 break;
             case MotionEvent.ACTION_CANCEL:
-                setTargetOffsetTopAndBottom(-mCurrentTargetOffsetTop, true);
+                setTargetOffsetTopAndBottom(0, true);
                 break;
         }
-        return false;
+        return true;
     }
 
     private float getMotionEventY(MotionEvent ev, int activePointerId) {
@@ -259,26 +263,28 @@ public class MaterialPullLayout extends ViewGroup {
         return MotionEventCompat.getY(ev, index);
     }
 
-    private void setTargetOffsetTopAndBottom(int offset, boolean requiresUpdate) {
+    private void setTargetOffsetTopAndBottom(int overScroll, boolean requiresUpdate) {
         Log.i(TAG, "mPullState" + mPullState);
         if (mPullState == STATE_PULLING_DOWN
                 || mPullState == STATE_PULL_DOWN_TIPPING
                 || mPullState == STATE_PULL_DOWN_RELEASE) {
             mTopView.setVisibility(VISIBLE);
             mTopView.bringToFront();
-            mTopView.offsetTopAndBottom(offset);
+            mTopView.offsetTopAndBottom(overScroll - mCurrentTargetOffsetTop);
             mCurrentTargetOffsetTop = mTopView.getTop();
         } else if (mPullState == STATE_PULLING_UP
                 || mPullState == STATE_PULL_UP_TIPPING
                 || mPullState == STATE_PULL_UP_RELEASE) {
-            mBottomView.setVisibility(VISIBLE);
-            mBottomView.bringToFront();
-            mBottomView.offsetTopAndBottom(offset);
-            mCurrentTargetOffsetTop = mBottomView.getTop();
+//            mBottomView.setVisibility(VISIBLE);
+//            mBottomView.bringToFront();
+//            mBottomView.offsetTopAndBottom(overScroll - mCurrentTargetOffsetTop);
+//            mCurrentTargetOffsetTop = overScroll;
+            mTarget.offsetTopAndBottom(overScroll - mCurrentTargetOffsetTop);
+            mCurrentTargetOffsetTop = mTarget.getTop();
         }
-//        mTarget.offsetTopAndBottom(offset);
-//        mCurrentTargetOffsetTop = mTarget.getTop();
 
+//        mTarget.offsetTopAndBottom(overScroll - mCurrentTargetOffsetTop);
+//        mCurrentTargetOffsetTop = mTarget.getTop();
         if (requiresUpdate && android.os.Build.VERSION.SDK_INT < 11) {
             invalidate();
         }
@@ -296,7 +302,18 @@ public class MaterialPullLayout extends ViewGroup {
     }
 
     public boolean canTargetScrollDown() {
-        return ViewCompat.canScrollVertically(mTarget, -1);
+        if (android.os.Build.VERSION.SDK_INT < 14) {
+            if (mTarget instanceof AbsListView) {
+                final AbsListView absListView = (AbsListView) mTarget;
+                return absListView.getChildCount() > 0
+                        && (absListView.getFirstVisiblePosition() > 0 || absListView.getChildAt(0)
+                        .getTop() < absListView.getPaddingTop());
+            } else {
+                return ViewCompat.canScrollVertically(mTarget, -1) || mTarget.getScrollY() > 0;
+            }
+        } else {
+            return ViewCompat.canScrollVertically(mTarget, -1);
+        }
     }
 
     public boolean canTargetScrollUp() {

@@ -9,6 +9,7 @@ import android.widget.Button;
 import android.widget.TableLayout;
 
 import com.osshare.andos.R;
+import com.osshare.andos.base.abs.AbsActivity;
 import com.osshare.framework.base.BaseActivity;
 
 import tv.danmaku.ijk.media.example.widget.media.AndroidMediaController;
@@ -19,7 +20,7 @@ import tv.danmaku.ijk.media.player.IjkMediaPlayer;
 /**
  * Created by apple on 16/11/14.
  */
-public class IjkPlayerActivity extends BaseActivity {
+public class IjkPlayerActivity extends AbsActivity {
     private static final int REQUEST_CODE_FILE_SELECT=0X7113;
     private Button btnSelect;
     private IjkVideoView videoView;
@@ -31,6 +32,7 @@ public class IjkPlayerActivity extends BaseActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_player);
+        immersiveHeaderContainer(R.id.layout_title_bar);
 
         btnSelect = (Button) findViewById(R.id.btn_select);
         videoView = (IjkVideoView) findViewById(R.id.ijk_video_view);

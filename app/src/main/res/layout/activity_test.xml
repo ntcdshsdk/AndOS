@@ -9,7 +9,25 @@
         android:id="@+id/layout_title_bar"
         layout="@layout/layout_title_bar_center" />
 
-    <com.osshare.core.view.pull.MaterialPullLayout
+    <com.osshare.core.view.Banner
+        android:id="@+id/vf_container"
+        android:layout_width="match_parent"
+        android:layout_height="150dp">
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:src="@drawable/img_banner"/>
+        <ImageView
+            android:layout_width="500dp"
+            android:layout_height="match_parent"
+            android:src="@drawable/img_banner"/>
+        <ImageView
+            android:layout_width="500dp"
+            android:layout_height="match_parent"
+            android:src="@drawable/img_banner"/>
+    </com.osshare.core.view.Banner>
+
+    <com.osshare.core.view.pull.temp.MaterialPullLayout
         android:id="@+id/pl_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
@@ -17,7 +35,7 @@
             android:id="@+id/rv_content"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"/>
-    </com.osshare.core.view.pull.MaterialPullLayout>
+    </com.osshare.core.view.pull.temp.MaterialPullLayout>
 
 
 </LinearLayout>

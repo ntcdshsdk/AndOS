@@ -40,7 +40,7 @@ public class HomeFragment extends BaseFragment {
         rvContent = (RecyclerView) view.findViewById(R.id.rv_content);
         rvContent.setLayoutManager(new LinearLayoutManager(getActivity()));
         adapter = new BaseAdapter<String>(getActivity(), Arrays.asList(
-                new String[]{"news","ecb","video","manager"})) {
+                new String[]{"PullableLayout","SwipRefreshLayout","MaterialPullLayout","MXLayout"})) {
             @Override
             public View getItemView(ViewGroup parent, int viewType) {
                 return inflater.inflate(R.layout.layout_item_main_home, parent, false);
@@ -58,16 +58,16 @@ public class HomeFragment extends BaseFragment {
             public void onItemClick(ViewGroup parent, BaseViewHolder holder) {
                 String itemBean = adapter.getItem(holder.getLayoutPosition());
                 switch (itemBean){
-                    case "news":
+                    case "PullableLayout":
                         startActivity(new Intent(getActivity(),NewsActivity.class));
                         break;
-                    case "ecb":
+                    case "SwipRefreshLayout":
                         startActivity(new Intent(getActivity(),ECBActivity.class));
                         break;
-                    case "video":
+                    case "MaterialPullLayout":
                         startActivity(new Intent(getActivity(),TestActivity.class));
                         break;
-                    case "manager":
+                    case "MXLayout":
                         startActivity(new Intent(getActivity(),ManagerActivity.class));
                         break;
                 }

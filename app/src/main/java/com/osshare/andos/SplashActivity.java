@@ -15,6 +15,7 @@ import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
 
+import com.osshare.andos.base.abs.AbsActivity;
 import com.osshare.andos.bean.User;
 import com.osshare.andos.module.login.LoginActivity;
 import com.osshare.andos.manager.ImKkApplication;
@@ -26,7 +27,7 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 
-public class SplashActivity extends BaseActivity {
+public class SplashActivity extends AbsActivity {
 
     private static final int INIT_END = 0X000016;
     private static final int ANIMATION_END = 0X000017;

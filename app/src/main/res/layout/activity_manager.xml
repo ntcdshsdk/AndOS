@@ -8,9 +8,14 @@
         android:id="@+id/layout_title_bar"
         layout="@layout/layout_title_bar_center" />
 
-    <android.support.v7.widget.RecyclerView
-        android:id="@+id/rv_content"
+    <com.osshare.core.view.pull.temp.MXLayout
+        android:id="@+id/pl_container"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
+        android:layout_height="wrap_content">
+        <android.support.v7.widget.RecyclerView
+            android:id="@+id/rv_content"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+    </com.osshare.core.view.pull.temp.MXLayout>
 
 </LinearLayout>

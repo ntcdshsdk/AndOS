@@ -15,7 +15,7 @@
         android:background="@color/yellow"
         android:visibility="gone" />
 
-    <com.osshare.core.view.pull.PullableLayout
+    <com.osshare.core.view.pull.temp.SwipRefreshLayout
         android:id="@+id/pl_container"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
@@ -26,5 +26,5 @@
             android:layout_height="wrap_content">
 
         </android.support.v7.widget.RecyclerView>
-    </com.osshare.core.view.pull.PullableLayout>
+    </com.osshare.core.view.pull.temp.SwipRefreshLayout>
 </LinearLayout>

@@ -9,6 +9,7 @@ import android.widget.TextView;
 
 import com.osshare.andos.MainActivity;
 import com.osshare.andos.R;
+import com.osshare.andos.base.abs.AbsActivity;
 import com.osshare.andos.module.login.mvp.LoginPresenter;
 import com.osshare.andos.module.login.mvp.LoginView;
 import com.osshare.framework.base.BaseActivity;
@@ -18,7 +19,7 @@ import javax.inject.Inject;
 /**
  * Created by apple on 16/10/6.
  */
-public class LoginActivity extends BaseActivity implements LoginView {
+public class LoginActivity extends AbsActivity implements LoginView {
 
     @Inject
     private LoginPresenter presenter;
@@ -34,6 +35,7 @@ public class LoginActivity extends BaseActivity implements LoginView {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login);
+        immersiveHeaderContainer(R.id.layout_title_bar);
 
         btnLogin = (Button) findViewById(R.id.btn_login);
         etAccount = (EditText) findViewById(R.id.et_account);

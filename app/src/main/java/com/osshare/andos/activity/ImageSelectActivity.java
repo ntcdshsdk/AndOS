@@ -8,10 +8,11 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 
 import com.osshare.andos.R;
+import com.osshare.andos.base.abs.AbsActivity;
 import com.osshare.andos.module.news.bean.News;
 import com.osshare.andos.module.news.bean.NewsResData;
 import com.osshare.andos.module.news.module.NewsModule;
-import com.osshare.core.view.pull.PullableLayout;
+import com.osshare.core.view.pull.temp.PullableXLayout;
 import com.osshare.framework.base.BaseActivity;
 import com.osshare.framework.base.BaseAdapter;
 import com.osshare.framework.base.BaseViewHolder;
@@ -25,11 +26,11 @@ import io.reactivex.disposables.Disposable;
 /**
  * Created by apple on 16/11/29.
  */
-public class ImageSelectActivity extends BaseActivity {
+public class ImageSelectActivity extends AbsActivity {
     private static final int SELECT_MAX = 1;
     private static final int SELECT_MIN = 0;
 
-    private PullableLayout plContainer;
+    private PullableXLayout plContainer;
     private RecyclerView rvContent;
     private BaseAdapter<News> adapter;
 
@@ -39,9 +40,10 @@ public class ImageSelectActivity extends BaseActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_image_select);
+        immersiveHeaderContainer(R.id.layout_title_bar);
 
-        plContainer = (PullableLayout) findViewById(R.id.pl_container);
-        plContainer.setOnPullListener(new PullableLayout.OnPullListener() {
+        plContainer = (PullableXLayout) findViewById(R.id.pl_container);
+        plContainer.setOnPullListener(new PullableXLayout.OnPullListener() {
             @Override
             public void onPullDown() {
                 num = 30;

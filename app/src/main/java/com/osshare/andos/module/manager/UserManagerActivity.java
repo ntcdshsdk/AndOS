@@ -10,6 +10,7 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.osshare.andos.R;
+import com.osshare.andos.base.abs.AbsActivity;
 import com.osshare.andos.bean.User;
 import com.osshare.andos.module.manager.bean.WealthInvestment;
 import com.osshare.framework.base.BaseActivity;
@@ -23,7 +24,7 @@ import java.util.List;
 /**
  * Created by apple on 16/12/11.
  */
-public class UserManagerActivity extends BaseActivity {
+public class UserManagerActivity extends AbsActivity {
 
     private RecyclerView rvContent;
     private BaseAdapter<User> adapter;

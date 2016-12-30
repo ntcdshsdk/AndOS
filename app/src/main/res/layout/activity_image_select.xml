@@ -3,7 +3,7 @@
     android:orientation="vertical"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
-    <com.osshare.core.view.pull.PullableLayout
+    <com.osshare.core.view.pull.temp.PullableXLayout
         android:id="@+id/pl_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
@@ -13,6 +13,6 @@
             android:layout_height="wrap_content">
 
         </android.support.v7.widget.RecyclerView>
-    </com.osshare.core.view.pull.PullableLayout>
+    </com.osshare.core.view.pull.temp.PullableXLayout>
 
 </LinearLayout>

@@ -4,6 +4,7 @@ import android.os.Bundle;
 import android.webkit.WebView;
 
 import com.osshare.andos.R;
+import com.osshare.andos.base.abs.AbsActivity;
 import com.osshare.andos.view.web.BaseWebView;
 import com.osshare.andos.view.web.BaseWebViewClient;
 import com.osshare.framework.base.BaseActivity;
@@ -12,7 +13,7 @@ import com.osshare.framework.manager.Constant;
 /**
  * Created by apple on 16/11/28.
  */
-public class WebViewActivity extends BaseActivity {
+public class WebViewActivity extends AbsActivity {
     private String url;
     private WebView wvContent;
 
@@ -20,6 +21,7 @@ public class WebViewActivity extends BaseActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_webview);
+        immersiveHeaderContainer(R.id.layout_title_bar);
 
         url = getIntent().getStringExtra(Constant.KEY_URL);
 
